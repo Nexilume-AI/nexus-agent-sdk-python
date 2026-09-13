@@ -127,6 +127,9 @@ class LinuxIPv6InstallTest(unittest.TestCase):
         self.assertIn("--interface eth0 --prefix " + PREFIX, unit)
         self.assertIn("CapabilityBoundingSet=CAP_NET_ADMIN", unit)
         self.assertIn("NoNewPrivileges=true", unit)
+        # Without CAP_CHOWN, root can assign the socket only to its own group.
+        self.assertIn("Group=nexus-agent\n", unit)
+        self.assertNotIn("CAP_CHOWN", unit)
         self.assertIn("ProtectSystem=strict", unit)
 
     def test_upstream_relay_service_has_raw_socket_capability_and_flag(self):

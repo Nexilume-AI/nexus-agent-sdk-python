@@ -475,6 +475,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+Group={GROUP_NAME}
 Environment=PYTHONPATH={paths.runtime.as_posix()}
 Environment=PYTHONDONTWRITEBYTECODE=1
 ExecStart={python} -m nexus_agent.addressd --interface {candidate.interface} --prefix {prefix} --socket {SOCKET_PATH} --socket-group {GROUP_NAME}{mode_flag}
