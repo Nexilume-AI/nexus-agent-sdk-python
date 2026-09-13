@@ -730,38 +730,39 @@ class NexusComputerRuntimeTests(unittest.TestCase):
 
                 socket = Socket()
                 stream_id = "stream-live-terminal"
-                await runtime._handle_terminal_stream_frame(socket, {
-                    "type": "terminal_stream_open",
-                    "stream_id": stream_id,
-                    "shell": "auto",
-                    "workspace_root": runtime.config["workspace_root"],
-                })
-                self.assertEqual(socket.frames[-1]["type"], "terminal_stream_opened")
-
-                await runtime._handle_terminal_stream_frame(socket, {
-                    "type": "terminal_stream_input",
-                    "stream_id": stream_id,
-                    "data": "echo nexus-stream-ok\n",
-                })
-                deadline = time.monotonic() + 5
-                while time.monotonic() < deadline:
-                    if any(
+                try:
+                    await runtime._handle_terminal_stream_frame(socket, {
+                        "type": "terminal_stream_open",
+                        "stream_id": stream_id,
+                        "shell": "auto",
+                        "workspace_root": runtime.config["workspace_root"],
+                    })
+                    self.assertEqual(socket.frames[-1]["type"], "terminal_stream_opened")
+    
+                    await runtime._handle_terminal_stream_frame(socket, {
+                        "type": "terminal_stream_input",
+                        "stream_id": stream_id,
+                        "data": "echo nexus-stream-ok\n",
+                    })
+                    deadline = time.monotonic() + 30  # Allow cold PowerShell startup on CI.
+                    while time.monotonic() < deadline:
+                        if any(
+                            frame.get("type") == "terminal_stream_output"
+                            and "nexus-stream-ok" in str(frame.get("data") or "")
+                            for frame in socket.frames
+                        ):
+                            break
+                        await asyncio.sleep(0.05)
+                    self.assertTrue(any(
                         frame.get("type") == "terminal_stream_output"
                         and "nexus-stream-ok" in str(frame.get("data") or "")
                         for frame in socket.frames
-                    ):
-                        break
-                    await asyncio.sleep(0.05)
-                self.assertTrue(any(
-                    frame.get("type") == "terminal_stream_output"
-                    and "nexus-stream-ok" in str(frame.get("data") or "")
-                    for frame in socket.frames
-                ))
-
-                await runtime._handle_terminal_stream_frame(socket, {
-                    "type": "terminal_stream_close",
-                    "stream_id": stream_id,
-                })
+                    ))
+                finally:
+                    await runtime._handle_terminal_stream_frame(socket, {
+                        "type": "terminal_stream_close",
+                        "stream_id": stream_id,
+                    })
                 self.assertEqual(socket.frames[-1]["type"], "terminal_stream_closed")
                 self.assertNotIn(stream_id, runtime._terminals)
 
