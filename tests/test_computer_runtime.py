@@ -525,12 +525,15 @@ class NexusComputerRuntimeTests(unittest.TestCase):
             ), mock.patch.object(
                 runtime, "_wait_for_instance_start", return_value=True
             ) as wait_for_start, mock.patch(
+                "nexus_agent.computer_runtime._wait_for_instance_lock_release", return_value=None
+            ) as wait_for_release, mock.patch(
                 "nexus_agent.computer_runtime.subprocess.Popen"
             ) as popen:
                 runtime.restart_user_service()
 
             popen.assert_called_once()
             wait_for_start.assert_called_once()
+            wait_for_release.assert_called_once()
             self.assertFalse(runtime.restart_request_path.exists())
 
     def test_running_runtime_consumes_graceful_restart_request(self) -> None:
