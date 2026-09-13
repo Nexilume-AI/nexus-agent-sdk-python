@@ -1,0 +1,7 @@
+include LICENSE README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md RELEASING.md
+include install-linux.sh
+recursive-include examples *.py *.md *.txt Dockerfile
+recursive-include deploy *.example *.service *.sysusers *.ps1
+recursive-include tests *.py
+recursive-include scripts *.py
+global-exclude *.pyc

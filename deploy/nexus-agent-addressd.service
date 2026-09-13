@@ -1,0 +1,25 @@
+[Unit]
+Description=Nexus per-Agent IPv6 address allocator
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/nexus-agent/addressd.env
+RuntimeDirectory=nexus-agent
+RuntimeDirectoryMode=0755
+StateDirectory=nexus-agent
+ConfigurationDirectory=nexus-agent
+ExecStart=/usr/local/bin/nexus-agent-addressd --interface ${NEXUS_ADDRESSD_INTERFACE} --prefix ${NEXUS_ADDRESSD_PREFIX} --socket-group nexus-agent
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+CapabilityBoundingSet=CAP_NET_ADMIN
+AmbientCapabilities=CAP_NET_ADMIN
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/etc/nexus-agent /var/lib/nexus-agent /run/nexus-agent
+
+[Install]
+WantedBy=multi-user.target

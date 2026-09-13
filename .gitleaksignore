@@ -1,0 +1,2 @@
+# Invalid PEM rejection fixture; body is literally "secret", not a usable key.
+tests/test_auth.py:private-key:350

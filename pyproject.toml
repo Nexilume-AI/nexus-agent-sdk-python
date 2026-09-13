@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=83,<84"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nexus-openwrt-agent-sdk"
+version = "0.46.2"
+readme = "README.md"
+description = "Python Agent SDK for Nexus OpenWrt and hosted MCP runtimes"
+requires-python = ">=3.9"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{name = "Nexus OpenWrt Team"}]
+dependencies = []
+
+[project.scripts]
+nexus-agent = "nexus_agent.ipv6_cli:main"
+nexus-agent-security = "nexus_agent.security_profile:main"
+nexus-agent-addressd = "nexus_agent.addressd:main"
+nexus-agent-addressd-service = "nexus_agent.windows_service:main"
+nexus-computer = "nexus_agent.computer_runtime:main"
+
+[project.optional-dependencies]
+fastmcp = ["fastmcp>=3.0,<4"]
+fastmcp-tasks = ["fastmcp>=3.0,<4", "fastmcp-tasks>=0.1,<1"]
+a2a = ["a2a-sdk>=1.1,<2"]
+windows = ["pywin32>=306; platform_system == 'Windows'"]
+browser = ["playwright>=1.50,<2"]
+computer = ["websockets>=15,<16", "cryptography>=50.0.1,<51"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.urls]
+Repository = "https://github.com/Nexilume-AI/nexus-agent-sdk-python"
+Issues = "https://github.com/Nexilume-AI/nexus-agent-sdk-python/issues"
+Changelog = "https://github.com/Nexilume-AI/nexus-agent-sdk-python/blob/main/CHANGELOG.md"
