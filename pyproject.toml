@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nexus-openwrt-agent-sdk"
-version = "0.46.2"
+version = "0.46.3"
 readme = "README.md"
 description = "Python Agent SDK for Nexus OpenWrt and hosted MCP runtimes"
 requires-python = ">=3.9"
@@ -26,7 +26,7 @@ fastmcp-tasks = ["fastmcp>=3.0,<4", "fastmcp-tasks>=0.1,<1"]
 a2a = ["a2a-sdk>=1.1,<2"]
 windows = ["pywin32>=306; platform_system == 'Windows'"]
 browser = ["playwright>=1.50,<2"]
-computer = ["websockets>=15,<16", "cryptography>=50.0.1,<51"]
+computer = ["websockets>=15,<16", "cryptography>=50.0.1,<51", "python-socks[asyncio]>=2.4.3,<3"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

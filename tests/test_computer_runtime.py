@@ -738,11 +738,11 @@ class NexusComputerRuntimeTests(unittest.TestCase):
                         "workspace_root": runtime.config["workspace_root"],
                     })
                     self.assertEqual(socket.frames[-1]["type"], "terminal_stream_opened")
-    
+
                     await runtime._handle_terminal_stream_frame(socket, {
                         "type": "terminal_stream_input",
                         "stream_id": stream_id,
-                        "data": "echo nexus-stream-ok\n",
+                        "data": "echo nexus-stream-ok" + ("\r" if os.name != "nt" else "\n"),
                     })
                     deadline = time.monotonic() + 30  # Allow cold PowerShell startup on CI.
                     while time.monotonic() < deadline:
@@ -767,6 +767,51 @@ class NexusComputerRuntimeTests(unittest.TestCase):
                 self.assertNotIn(stream_id, runtime._terminals)
 
         asyncio.run(scenario())
+
+    def test_http_requests_identify_runtime_without_changing_authentication(self) -> None:
+        from nexus_agent import computer_runtime as module
+        import nexus_agent
+        self.assertEqual(module.COMPUTER_USER_AGENT, f"Nexus-Computer/{nexus_agent.__version__}")
+        opener = mock.MagicMock()
+        opener.open.return_value.__enter__.return_value.read.return_value = b'{"data":{"ok":true}}'
+        with mock.patch.object(module, "build_opener", return_value=opener):
+            module._request_json("http://127.0.0.1:8000", "/session/", payload={"nonce": "test"})
+            request = opener.open.call_args.args[0]
+            self.assertEqual(request.get_header("User-agent"), module.COMPUTER_USER_AGENT)
+            self.assertEqual(json.loads(request.data), {"nonce": "test"})
+            module._upload_bytes("http://127.0.0.1:8000", "/api/v1/computer-runtime/upload/",
+                                 token="test-ticket", content=b"test", content_type="text/plain")
+            request = opener.open.call_args.args[0]
+            self.assertEqual(request.get_header("User-agent"), module.COMPUTER_USER_AGENT)
+            self.assertEqual(request.get_header("Authorization"), "Bearer test-ticket")
+
+    def test_websocket_identifies_runtime_and_preserves_ticket(self) -> None:
+        from nexus_agent import computer_runtime as module
+        class HandshakeObserved(Exception):
+            pass
+        async def scenario():
+            with tempfile.TemporaryDirectory() as directory:
+                runtime = self.runtime(Path(directory))
+                connector = mock.MagicMock()
+                connector.return_value.__aenter__.side_effect = HandshakeObserved
+                with mock.patch.object(runtime, "_create_cloud_session", return_value={
+                    "websocket_url": "wss://cloud.example.test/runtime/", "ticket": "test-ticket"
+                }), mock.patch.object(module, "_require_websockets", return_value=mock.Mock(connect=connector)):
+                    with self.assertRaises(HandshakeObserved):
+                        await runtime._run_connection()
+                self.assertEqual(connector.call_args.kwargs["user_agent_header"], module.COMPUTER_USER_AGENT)
+                self.assertEqual(connector.call_args.kwargs["additional_headers"], {"Authorization": "Bearer test-ticket"})
+                self.assertIsNotNone(connector.call_args.kwargs["ssl"])
+        asyncio.run(scenario())
+
+    def test_terminal_normalizes_posix_enter_but_preserves_windows_input(self) -> None:
+        terminal = object.__new__(_TerminalProcess)
+        terminal.process = mock.Mock()
+        terminal.process.poll.return_value = None
+        for platform, expected in (("posix", b"one\ntwo\nthree\n"), ("nt", b"one\rtwo\r\nthree\n")):
+            with self.subTest(platform=platform), mock.patch("nexus_agent.computer_runtime.os.name", platform):
+                terminal.write("one\rtwo\r\nthree\n")
+                terminal.process.stdin.write.assert_called_with(expected)
 
     def test_terminal_output_preserves_utf8_sequence_split_across_reads(self) -> None:
         terminal = object.__new__(_TerminalProcess)

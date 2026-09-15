@@ -294,6 +294,9 @@ def _validated_cloud_origin(value: str) -> str:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
+COMPUTER_USER_AGENT = "Nexus-Computer/0.46.3"
+
+
 def _request_json(
     cloud_origin: str,
     path: str,
@@ -308,7 +311,7 @@ def _request_json(
         urljoin(cloud_origin.rstrip("/") + "/", path.lstrip("/")),
         data=body,
         method="POST",
-        headers={"Accept": "application/json", "Content-Type": "application/json; charset=utf-8"},
+        headers={"Accept": "application/json", "Content-Type": "application/json; charset=utf-8", "User-Agent": COMPUTER_USER_AGENT},
     )
     handlers = [ProxyHandler({})]
     if cloud_origin.startswith("https://"):
@@ -353,6 +356,7 @@ def _upload_bytes(
         headers={
             "Accept": "application/json",
             "Authorization": f"Bearer {token}",
+            "User-Agent": COMPUTER_USER_AGENT,
             "Content-Type": str(content_type or "application/octet-stream"),
         },
     )
@@ -447,7 +451,11 @@ class _TerminalProcess:
     def write(self, data: str) -> None:
         if self.process.poll() is not None or self.process.stdin is None:
             raise RuntimeOperationError("TERMINAL_SESSION_LOST", "Computer terminal session is no longer running")
-        self.process.stdin.write(str(data).encode("utf-8"))
+        text = str(data)
+        if os.name != "nt":
+            # Browser Enter is CR; POSIX pipe shells require LF (this is not a PTY).
+            text = text.replace("\r\n", "\n").replace("\r", "\n")
+        self.process.stdin.write(text.encode("utf-8"))
         self.process.stdin.flush()
 
     def close(self) -> None:
@@ -1424,6 +1432,7 @@ class NexusComputerRuntime:
         async with websockets.connect(
             websocket_url,
             additional_headers={"Authorization": f"Bearer {session['ticket']}"},
+            user_agent_header=COMPUTER_USER_AGENT,
             ssl=ssl_context,
             max_size=4 * 1024 * 1024,
             ping_interval=20,

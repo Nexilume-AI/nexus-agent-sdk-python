@@ -88,6 +88,7 @@ def test_example_declares_and_reads_file_and_audio_inputs():
 
 def test_example_uses_its_own_stable_cloud_identity(monkeypatch):
     monkeypatch.setenv("NEXUS_ROUTER_URL", "http://127.0.0.1:7446/")
+    monkeypatch.setenv("NEXUS_AGENT_ADDRESS", "192.0.2.20")  # No host-network discovery in contract tests.
     monkeypatch.delenv("NEXUS_AGENT_ID", raising=False)
     monkeypatch.delenv("NEXUS_AGENT_CLOUD_NAME", raising=False)
 
