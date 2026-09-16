@@ -813,6 +813,44 @@ class NexusComputerRuntimeTests(unittest.TestCase):
                 terminal.write("one\rtwo\r\nthree\n")
                 terminal.process.stdin.write.assert_called_with(expected)
 
+    def test_terminal_auto_uses_zsh_on_macos_and_preserves_explicit_shells(self) -> None:
+        cwd = Path(tempfile.gettempdir())
+        cases = [
+            ("Darwin", "auto", "/usr/bin/zsh", "/usr/bin/zsh"),
+            ("Darwin", "auto", None, "/bin/zsh"),
+            ("Darwin", "bash", "/usr/bin/bash", "/usr/bin/bash"),
+            ("Darwin", "sh", "/bin/sh", "/bin/sh"),
+            ("Linux", "auto", "/usr/bin/bash", "/usr/bin/bash"),
+            ("Linux", "auto", None, "/bin/sh"),
+        ]
+        for system, shell, located, expected in cases:
+            with self.subTest(system=system, shell=shell, located=located):
+                with mock.patch("nexus_agent.computer_runtime.os.name", "posix"), mock.patch(
+                    "nexus_agent.computer_runtime.platform_module.system", return_value=system
+                ), mock.patch("nexus_agent.computer_runtime.shutil.which", return_value=located) as which, mock.patch(
+                    "nexus_agent.computer_runtime.subprocess.Popen"
+                ) as popen, mock.patch("nexus_agent.computer_runtime.threading.Thread"):
+                    _TerminalProcess(shell=shell, cwd=cwd)
+                which.assert_called_once_with("zsh" if system == "Darwin" and shell == "auto" else "bash" if shell in {"auto", "bash"} else "sh")
+                self.assertEqual(popen.call_args.args[0], [expected])
+                self.assertTrue(popen.call_args.kwargs["start_new_session"])
+
+    @unittest.skipUnless(sys.platform == "darwin", "Requires a real macOS zsh")
+    def test_macos_default_terminal_executes_zsh_with_browser_enter(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            terminal = _TerminalProcess(shell="auto", cwd=Path(directory))
+            try:
+                terminal.write('print -r -- "nexus-zsh:${ZSH_VERSION}"\r')
+                output = ""
+                deadline = time.monotonic() + 5
+                while time.monotonic() < deadline:
+                    output += terminal.read(0.1)
+                    if "nexus-zsh:" in output:
+                        break
+                self.assertRegex(output, r"nexus-zsh:\d+\.")
+            finally:
+                terminal.close()
+
     def test_terminal_output_preserves_utf8_sequence_split_across_reads(self) -> None:
         terminal = object.__new__(_TerminalProcess)
         terminal.output = queue.Queue()

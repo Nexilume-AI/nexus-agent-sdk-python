@@ -15,6 +15,7 @@ The core SDK has no third-party runtime dependencies. Browser, Computer Runtime,
 | --- | --- |
 | Try a Python agent without a router or Cloud account | [Run your first agent](#run-your-first-agent) |
 | Register an agent with Nexus OpenWrt | [Connect to OpenWrt](#connect-to-openwrt) |
+| Make distributed Agents call each other | [Two-Agent example](#example-two-distributed-agents-calling-each-other) |
 | Serve an agent as MCP tools | [Use a hosted MCP runtime](#use-a-hosted-mcp-runtime) |
 | Connect my computer to Nexus Cloud | [Set up Computer Runtime](#set-up-computer-runtime) |
 | Give agents their own IPv6 addresses | [Configure Agent IPv6 on Linux](#configure-agent-ipv6-on-linux) |
@@ -46,10 +47,10 @@ On Ubuntu, install `python3-venv` if creating the environment reports that `ensu
 
 ### 2. Install a release wheel
 
-Download the `.whl` file from [GitHub Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases), then install it in your environment. For release 0.46.3:
+Download the `.whl` file from [GitHub Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases), then install it in your environment. For release 0.46.4:
 
 ```sh
-python -m pip install ./nexus_openwrt_agent_sdk-0.46.3-py3-none-any.whl
+python -m pip install ./nexus_openwrt_agent_sdk-0.46.4-py3-none-any.whl
 python -c "import nexus_agent; print(nexus_agent.__version__)"
 ```
 
@@ -58,7 +59,7 @@ Replace the filename with the wheel you downloaded. This project currently distr
 To include optional features, add extras to the local wheel path:
 
 ```sh
-python -m pip install "./nexus_openwrt_agent_sdk-0.46.3-py3-none-any.whl[computer,browser,fastmcp,a2a]"
+python -m pip install "./nexus_openwrt_agent_sdk-0.46.4-py3-none-any.whl[computer,browser,fastmcp,a2a]"
 ```
 
 | Extra | Enables |
@@ -162,6 +163,105 @@ Set `NEXUS_ROUTER_URL` if discovery cannot find your router. Set `NEXUS_AGENT_AD
 
 Credentials belong in your environment or deployment configuration. Supported options include `NEXUS_AGENT_TOKEN`, or `NEXUS_AGENT_CLIENT_ID` and `NEXUS_AGENT_CLIENT_SECRET` for configured OIDC authentication. Never put credentials in uploaded Python files.
 
+### Example: two distributed Agents calling each other
+
+Run Agent A on one computer and Agent B on another. Each registers the same `demo.hello` capability with Nexus OpenWrt and can call the other by its unique Agent identity:
+
+```text
+Computer A (agent-a)  <-->  Nexus OpenWrt  <-->  Computer B (agent-b)
+```
+
+**Before you start:** install the core SDK on both computers, enable Agent services on your router, and use its Agent Access Proxy URL. The router must be able to reach each computer's advertised address and listening port. Configure credentials as described above when your router requires them. This example uses router-mediated calls and does not require a Cloud account or per-agent public IPv6 addresses.
+
+Save the following as `distributed_agents.py` on both computers, or use [the ready-to-run source example](examples/distributed_agents.py):
+
+```python
+"""Run two Agents on separate hosts and call each other through OpenWrt."""
+
+import argparse
+import json
+
+from nexus_agent import NexusAgent, NexusAgentError
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("name", choices=("agent-a", "agent-b"))
+    parser.add_argument("--port", type=int, default=9443)
+    args = parser.parse_args()
+    peer = "agent-b" if args.name == "agent-a" else "agent-a"
+
+    agent = NexusAgent(
+        runtime="openwrt",
+        router="auto",  # Reads NEXUS_ROUTER_URL.
+        tenant="demo",
+        agent_id=args.name,
+        port=args.port,
+        cloud_publish=False,
+    )
+
+    @agent.capability("demo.hello", public_ipv6=False)
+    def hello(payload):
+        return {"agent": args.name, "reply": f"Hello, {payload['from']}!"}
+
+    try:
+        with agent.start():
+            print(f"{agent.origin} is ready. Start {peer} before calling it.")
+            while True:
+                input(f"Press Enter to call {peer}; Ctrl+C to stop: ")
+                try:
+                    reply = agent.invoke(
+                        "demo.hello",
+                        {"from": args.name},
+                        target_agent=f"agent://demo/{peer}",
+                    )
+                    print(json.dumps(reply))
+                except NexusAgentError as error:
+                    print(f"Call failed: {error}. Check the peer and router, then retry.")
+    except (KeyboardInterrupt, EOFError):
+        pass  # Exiting the context unregisters this Agent and stops its listener.
+
+
+if __name__ == "__main__":
+    main()
+```
+
+**1. Start Agent A on Computer A.** In a terminal with the SDK environment activated, replace these sample addresses with your router and Computer A's reachable LAN address:
+
+```sh
+export NEXUS_ROUTER_URL=http://192.168.246.1:7446
+export NEXUS_AGENT_ADDRESS=192.168.246.10
+python distributed_agents.py agent-a
+```
+
+**2. Start Agent B on Computer B.** Use the same router and Computer B's own address:
+
+```sh
+export NEXUS_ROUTER_URL=http://192.168.246.1:7446
+export NEXUS_AGENT_ADDRESS=192.168.246.11
+python distributed_agents.py agent-b
+```
+
+In Windows PowerShell, set each variable with `$env:NAME = "value"` instead of `export NAME=value`; the Python commands are the same. If running from the source checkout, use `python examples/distributed_agents.py ...`.
+
+**3. Call in both directions.** Wait until both terminals print `is ready`, then press Enter in Agent A's terminal:
+
+```json
+{"agent": "agent-b", "reply": "Hello, agent-a!"}
+```
+
+Press Enter in Agent B's terminal to call A:
+
+```json
+{"agent": "agent-a", "reply": "Hello, agent-b!"}
+```
+
+`agent.invoke()` supplies the caller's `source_agent` identity automatically. `target_agent` selects the exact peer, even though both publish `demo.hello`. The receiving handler returns a reply without calling back, so the example cannot form a recursive call loop. The SDK renews registrations while the processes run and unregisters each Agent when you stop it with Ctrl+C.
+
+To try both processes on one computer, use that computer's reachable address in both terminals and start B with `--port 9444`. If registration succeeds but calls fail, check the peer process, router-to-host reachability, host firewall, and whether the configured credentials permit the call.
+
+**Across two OpenWrt routers:** point each Agent's `NEXUS_ROUTER_URL` at its local router and keep the two Agent identities distinct. The routers must already have cross-router capability routing and a working transport configured, with access allowed for the selected tenant and target. Changing the URLs alone does not establish connectivity through NAT. The Python registration and invocation code stays the same.
+
 ## Use a hosted MCP runtime
 
 Install the `fastmcp` extra. Set `runtime="hosted"` to run without OpenWrt discovery or registration:
@@ -209,12 +309,14 @@ nexus-computer unpair --registration <registration-id>
 
 `repair` repairs autostart for an existing pairing. `unpair` revokes the selected registration. You can pair the same computer with more than one workspace by running `setup` for each pairing link.
 
+When a terminal uses `shell="auto"`, Computer Runtime selects zsh on macOS, bash (with sh fallback) on Linux, and PowerShell on Windows. Explicit bash or sh selections on macOS are preserved. This is a pipe-based terminal; selecting zsh does not add PTY support. This default requires SDK 0.46.4 or newer and a Cloud server that preserves automatic Runtime shell selection. The 0.46.3 wheel predates this change.
+
 ### Upgrade an existing Computer Runtime
 
-Download the 0.46.3 wheel from [GitHub Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases/tag/v0.46.3). Activate the **same virtual environment used to install Runtime**, then run:
+Download the 0.46.4 wheel from [GitHub Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases/tag/v0.46.4). Activate the **same virtual environment used to install Runtime**, then run:
 
 ```sh
-python -m pip install --upgrade "./nexus_openwrt_agent_sdk-0.46.3-py3-none-any.whl[computer,browser]"
+python -m pip install --upgrade "./nexus_openwrt_agent_sdk-0.46.4-py3-none-any.whl[computer,browser]"
 nexus-computer restart
 nexus-computer status
 ```
@@ -328,6 +430,7 @@ Run these from a source checkout and read each example's configuration before st
 | Caller-authorized browser control | [browser_session_agent.py](examples/browser_session_agent.py) |
 | Run files and audio | [router_file_audio_agent.py](examples/router_file_audio_agent.py) |
 | Follow-up instructions during a Run | [router_follow_up_agent.py](examples/router_follow_up_agent.py) |
+| Two Agents calling each other through OpenWrt | [distributed_agents.py](examples/distributed_agents.py) |
 | Calling a specific remote agent | [targeted_invoke.py](examples/targeted_invoke.py) |
 
 Examples may require a configured router, Cloud, IPv6 transport or caller permissions. Some IPv6 examples explicitly disable authentication for controlled testing; review those settings before making a listener reachable outside your test network.

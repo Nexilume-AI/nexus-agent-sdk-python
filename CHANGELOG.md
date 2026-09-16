@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.46.4
+
+- Select zsh for automatic Computer Runtime terminals on macOS, with `/bin/zsh` as the fallback path. Explicit bash/sh choices remain unchanged.
+- Requires the accompanying Cloud update that forwards `auto` to Runtime instead of resolving it to sh on the server. Restart Runtime after upgrading and open a new terminal session.
+- Add shell-selection regressions and a real macOS zsh execution test.
+- Add a runnable two-Agent OpenWrt example with bidirectional calls and English README instructions.
+
+
 ## 0.46.3
 
 - Include SOCKS proxy support in the `computer` extra.

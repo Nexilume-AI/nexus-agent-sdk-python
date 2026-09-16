@@ -294,7 +294,7 @@ def _validated_cloud_origin(value: str) -> str:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
-COMPUTER_USER_AGENT = "Nexus-Computer/0.46.3"
+COMPUTER_USER_AGENT = "Nexus-Computer/0.46.4"
 
 
 def _request_json(
@@ -401,7 +401,10 @@ class _TerminalProcess:
             flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
             start_new_session = False
         else:
-            executable = shutil.which("bash" if shell in {"auto", "bash"} else "sh") or "/bin/sh"
+            if shell == "auto" and platform_module.system() == "Darwin":
+                executable = shutil.which("zsh") or "/bin/zsh"
+            else:
+                executable = shutil.which("bash" if shell in {"auto", "bash"} else "sh") or "/bin/sh"
             command = [executable]
             flags = 0
             start_new_session = True
