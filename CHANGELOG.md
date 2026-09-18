@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.46.5
+
+- Use a real POSIX PTY and an interactive shell for macOS/Linux Computer terminals, restoring the initial prompt, input echo, line editing and Ctrl+C.
+- Apply initial terminal dimensions and subsequent resize requests on both RPC and live-stream paths.
+- Drain final streamed output and release terminal resources when the shell exits or the stream closes. Windows retains its existing pipe transport.
+- Add real PTY regressions for prompts, zsh editing, resizing, interruption, stream output and process cleanup. Restart Runtime and open a new terminal after installing the updated SDK; existing pairings remain valid.
+
 ## 0.46.4
 
 - Select zsh for automatic Computer Runtime terminals on macOS, with `/bin/zsh` as the fallback path. Explicit bash/sh choices remain unchanged.

@@ -47,10 +47,10 @@ On Ubuntu, install `python3-venv` if creating the environment reports that `ensu
 
 ### 2. Install a release wheel
 
-Download the `.whl` file from [GitHub Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases), then install it in your environment. For release 0.46.4:
+Download the `.whl` file from [GitHub Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases), then install it in your environment. For release 0.46.5:
 
 ```sh
-python -m pip install ./nexus_openwrt_agent_sdk-0.46.4-py3-none-any.whl
+python -m pip install ./nexus_openwrt_agent_sdk-0.46.5-py3-none-any.whl
 python -c "import nexus_agent; print(nexus_agent.__version__)"
 ```
 
@@ -59,7 +59,7 @@ Replace the filename with the wheel you downloaded. This project currently distr
 To include optional features, add extras to the local wheel path:
 
 ```sh
-python -m pip install "./nexus_openwrt_agent_sdk-0.46.4-py3-none-any.whl[computer,browser,fastmcp,a2a]"
+python -m pip install "./nexus_openwrt_agent_sdk-0.46.5-py3-none-any.whl[computer,browser,fastmcp,a2a]"
 ```
 
 | Extra | Enables |
@@ -309,21 +309,21 @@ nexus-computer unpair --registration <registration-id>
 
 `repair` repairs autostart for an existing pairing. `unpair` revokes the selected registration. You can pair the same computer with more than one workspace by running `setup` for each pairing link.
 
-When a terminal uses `shell="auto"`, Computer Runtime selects zsh on macOS, bash (with sh fallback) on Linux, and PowerShell on Windows. Explicit bash or sh selections on macOS are preserved. This is a pipe-based terminal; selecting zsh does not add PTY support. This default requires SDK 0.46.4 or newer and a Cloud server that preserves automatic Runtime shell selection. The 0.46.3 wheel predates this change.
+When a terminal uses `shell="auto"`, Computer Runtime selects zsh on macOS, bash (with sh fallback) on Linux, and PowerShell on Windows. Explicit bash or sh selections on macOS are preserved. SDK 0.46.5 uses a POSIX pseudo-terminal (PTY) with an interactive shell on macOS/Linux, including prompts, input echo, Ctrl+C and terminal resizing. SDK 0.46.4 and earlier use pipes and do not include this PTY fix. Windows retains its existing PowerShell transport. This default requires SDK 0.46.4 or newer and a Cloud server that preserves automatic Runtime shell selection. The 0.46.3 wheel predates this change.
 
 ### Upgrade an existing Computer Runtime
 
-Download the 0.46.4 wheel from [GitHub Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases/tag/v0.46.4). Activate the **same virtual environment used to install Runtime**, then run:
+Download the 0.46.5 wheel from [GitHub Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases/tag/v0.46.5). Activate the **same virtual environment used to install Runtime**, then run:
 
 ```sh
-python -m pip install --upgrade "./nexus_openwrt_agent_sdk-0.46.4-py3-none-any.whl[computer,browser]"
+python -m pip install --upgrade "./nexus_openwrt_agent_sdk-0.46.5-py3-none-any.whl[computer,browser]"
 nexus-computer restart
 nexus-computer status
 ```
 
 Keep your existing Runtime configuration and device keys. Upgrading in the same environment preserves pairings; you do not need a new pairing link. Installation still comes before pairing for new computers.
 
-Version 0.46.3 includes the SOCKS dependency used by WebSocket system-proxy support, identifies Runtime HTTP/WebSocket requests with `Nexus-Computer/0.46.3`, and fixes browser Enter input for macOS/Linux pipe-based terminals. Proxy availability and Cloud firewall rules still determine connectivity. The terminal is a pipe-based shell, so full-screen tools that require a PTY are not supported by this fix.
+Version 0.46.3 includes the SOCKS dependency used by WebSocket system-proxy support, identifies Runtime HTTP/WebSocket requests with `Nexus-Computer/0.46.3`, and fixes browser Enter input for macOS/Linux pipe-based terminals. Proxy availability and Cloud firewall rules still determine connectivity. That release still uses a pipe-based shell; SDK 0.46.5 adds POSIX PTY support as described above.
 
 ### Linux browser setup
 

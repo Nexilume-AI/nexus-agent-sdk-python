@@ -279,4 +279,4 @@ __all__ = [
     "WorkspaceEntry",
 ]
 
-__version__ = "0.46.4"
+__version__ = "0.46.5"

@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 import platform as platform_module
 import queue
+import select
 import shlex
 import shutil
 import signal
@@ -294,7 +295,7 @@ def _validated_cloud_origin(value: str) -> str:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
-COMPUTER_USER_AGENT = "Nexus-Computer/0.46.4"
+COMPUTER_USER_AGENT = "Nexus-Computer/0.46.5"
 
 
 def _request_json(
@@ -376,7 +377,10 @@ def _upload_bytes(
 
 
 class _TerminalProcess:
-    def __init__(self, *, shell: str, cwd: Path) -> None:
+    def __init__(self, *, shell: str, cwd: Path, cols: int = 120, rows: int = 34) -> None:
+        self._master_fd: Optional[int] = None
+        self._pty_lock = threading.Lock()
+        self._reader_stop = threading.Event()
         if os.name == "nt":
             if shell in {"auto", "powershell"}:
                 # The browser and WSS protocol always send UTF-8. Windows PowerShell
@@ -405,19 +409,17 @@ class _TerminalProcess:
                 executable = shutil.which("zsh") or "/bin/zsh"
             else:
                 executable = shutil.which("bash" if shell in {"auto", "bash"} else "sh") or "/bin/sh"
-            command = [executable]
+            command = [sys.executable, os.path.join(os.path.dirname(__file__), "_terminal_child.py"), executable]
             flags = 0
             start_new_session = True
-        self.process = subprocess.Popen(
-            command,
-            cwd=str(cwd),
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            bufsize=0,
-            creationflags=flags,
-            start_new_session=start_new_session,
-        )
+        if os.name == "nt":
+            self.process = subprocess.Popen(
+                command, cwd=str(cwd), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT, bufsize=0, creationflags=flags,
+                start_new_session=start_new_session,
+            )
+        else:
+            self._start_pty(command, cwd=cwd, cols=cols, rows=rows)
         self.output: "queue.Queue[bytes]" = queue.Queue()
         # Keep decoder state across reads so a UTF-8 code point split between two
         # pipe/WebSocket frames is not replaced by U+FFFD.
@@ -425,7 +427,43 @@ class _TerminalProcess:
         self.reader = threading.Thread(target=self._read, name="nexus-computer-terminal", daemon=True)
         self.reader.start()
 
+    def _start_pty(self, command: list[str], *, cwd: Path, cols: int, rows: int) -> None:
+        import pty
+
+        master, slave = pty.openpty()
+        self._master_fd = master
+        try:
+            self.resize(cols=cols, rows=rows)
+            os.set_blocking(master, False)
+            environment = os.environ.copy()
+            environment["TERM"] = "xterm-256color"
+            self.process = subprocess.Popen(
+                command, cwd=str(cwd), stdin=slave, stdout=slave, stderr=slave,
+                env=environment, start_new_session=True, close_fds=True,
+            )
+        except BaseException:
+            os.close(master)
+            self._master_fd = None
+            raise
+        finally:
+            os.close(slave)
+
+    def resize(self, *, cols: int, rows: int) -> None:
+        if os.name == "nt":
+            return
+        import fcntl
+        import struct
+        import termios
+
+        size = struct.pack("HHHH", max(1, min(int(rows), 1000)), max(1, min(int(cols), 1000)), 0, 0)
+        with self._pty_lock:
+            if self._master_fd is not None:
+                fcntl.ioctl(self._master_fd, termios.TIOCSWINSZ, size)
+
     def _read(self) -> None:
+        if self._master_fd is not None:
+            self._read_pty()
+            return
         stream = self.process.stdout
         if stream is None:
             return
@@ -434,6 +472,29 @@ class _TerminalProcess:
             if not data:
                 return
             self.output.put(data)
+
+    def _read_pty(self) -> None:
+        try:
+            while not self._reader_stop.is_set():
+                # This thread owns closing master; writers/resizers share the lock.
+                master = self._master_fd
+                if not select.select([master], [], [], 0.1)[0]:
+                    continue
+                try:
+                    data = os.read(master, 4096)
+                except BlockingIOError:
+                    continue
+                except OSError:
+                    # Linux reports EIO when the last slave is closed; macOS EOF.
+                    break
+                if not data:
+                    break
+                self.output.put(data)
+        finally:
+            with self._pty_lock:
+                if self._master_fd is not None:
+                    os.close(self._master_fd)
+                    self._master_fd = None
 
     def read(self, timeout: float) -> str:
         chunks: list[bytes] = []
@@ -449,16 +510,31 @@ class _TerminalProcess:
                 break
             chunks.append(item)
             total += len(item)
-        return self._output_decoder.decode(b"".join(chunks)[:65536], final=False)
+        return self._output_decoder.decode(b"".join(chunks), final=False)
 
     def write(self, data: str) -> None:
-        if self.process.poll() is not None or self.process.stdin is None:
+        if self.process.poll() is not None:
             raise RuntimeOperationError("TERMINAL_SESSION_LOST", "Computer terminal session is no longer running")
-        text = str(data)
         if os.name != "nt":
-            # Browser Enter is CR; POSIX pipe shells require LF (this is not a PTY).
-            text = text.replace("\r\n", "\n").replace("\r", "\n")
-        self.process.stdin.write(text.encode("utf-8"))
+            pending = memoryview(str(data).encode("utf-8"))
+            deadline = time.monotonic() + 5
+            with self._pty_lock:
+                master = self._master_fd
+                if master is None:
+                    raise RuntimeOperationError("TERMINAL_SESSION_LOST", "Computer terminal session is no longer running")
+                while pending:
+                    if time.monotonic() >= deadline:
+                        raise RuntimeOperationError("TERMINAL_INPUT_TIMEOUT", "Computer terminal is not accepting input")
+                    if not select.select([], [master], [], 0.1)[1]:
+                        continue
+                    try:
+                        pending = pending[os.write(master, pending):]
+                    except BlockingIOError:
+                        continue
+            return
+        if self.process.stdin is None:
+            raise RuntimeOperationError("TERMINAL_SESSION_LOST", "Computer terminal session is no longer running")
+        self.process.stdin.write(str(data).encode("utf-8"))
         self.process.stdin.flush()
 
     def close(self) -> None:
@@ -467,14 +543,25 @@ class _TerminalProcess:
                 if os.name == "nt":
                     self.process.terminate()
                 else:
-                    os.killpg(self.process.pid, signal.SIGTERM)
+                    with self._pty_lock:
+                        if self._master_fd is not None:
+                            try:
+                                foreground = os.tcgetpgrp(self._master_fd)
+                                if foreground > 0 and foreground != self.process.pid:
+                                    os.killpg(foreground, signal.SIGHUP)
+                            except OSError:
+                                pass
+                    os.killpg(self.process.pid, signal.SIGHUP)
                 self.process.wait(timeout=5)
         except Exception:
             try:
                 self.process.kill()
+                self.process.wait(timeout=5)
             except Exception:
                 pass
         finally:
+            self._reader_stop.set()
+            self.reader.join(timeout=1)
             for stream in (self.process.stdin, self.process.stdout, self.process.stderr):
                 if stream is not None:
                     try:
@@ -1100,7 +1187,10 @@ class NexusComputerRuntime:
         if operation == "terminal.open":
             root = self._resolved_root(str(data.get("workspace_root") or ""))
             session_id = uuid.uuid4().hex
-            self._terminals[session_id] = _TerminalProcess(shell=str(data.get("shell") or "auto"), cwd=root)
+            self._terminals[session_id] = _TerminalProcess(
+                shell=str(data.get("shell") or "auto"), cwd=root,
+                cols=int(data.get("cols") or 120), rows=int(data.get("rows") or 34),
+            )
             return {"session_id": session_id}
         terminal = self._terminals.get(session_id)
         if terminal is None:
@@ -1111,6 +1201,7 @@ class NexusComputerRuntime:
             terminal.write(str(data.get("data") or ""))
             return {"written": True}
         if operation == "terminal.resize":
+            terminal.resize(cols=int(data.get("cols") or 120), rows=int(data.get("rows") or 34))
             return {"resized": True}
         if operation == "terminal.close":
             terminal.close()
@@ -1556,6 +1647,8 @@ class NexusComputerRuntime:
                     _TerminalProcess,
                     shell=str(frame.get("shell") or "auto"),
                     cwd=root,
+                    cols=int(frame.get("cols") or 120),
+                    rows=int(frame.get("rows") or 34),
                 )
                 self._terminals[stream_id] = terminal
                 await self._send(websocket, {"type": "terminal_stream_opened", "stream_id": stream_id})
@@ -1575,8 +1668,9 @@ class NexusComputerRuntime:
                 await asyncio.to_thread(terminal.write, data)
                 return
             if frame_type == "terminal_stream_resize":
-                # The current pipe-backed shell has no PTY resize primitive.  The
-                # bounded frame is intentionally accepted for protocol parity.
+                await asyncio.to_thread(
+                    terminal.resize, cols=int(frame.get("cols") or 120), rows=int(frame.get("rows") or 34),
+                )
                 return
             if frame_type == "terminal_stream_close":
                 await self._close_terminal_stream(stream_id)
@@ -1615,7 +1709,7 @@ class NexusComputerRuntime:
                             "data": chunk,
                         })
                         offset = end
-                if terminal.process.poll() is not None:
+                if terminal.process.poll() is not None and not terminal.reader.is_alive() and terminal.output.empty():
                     self._terminals.pop(stream_id, None)
                     await self._send(websocket, {
                         "type": "terminal_stream_closed",
@@ -1636,7 +1730,7 @@ class NexusComputerRuntime:
         finally:
             if self._terminals.get(stream_id) is terminal:
                 self._terminals.pop(stream_id, None)
-                await asyncio.to_thread(terminal.close)
+            await asyncio.to_thread(terminal.close)
 
     async def _close_terminal_stream(self, stream_id: str) -> None:
         terminal = self._terminals.pop(stream_id, None)

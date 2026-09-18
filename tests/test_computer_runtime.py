@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import queue
+import re
 import sys
 import tempfile
 import threading
@@ -804,14 +805,13 @@ class NexusComputerRuntimeTests(unittest.TestCase):
                 self.assertIsNotNone(connector.call_args.kwargs["ssl"])
         asyncio.run(scenario())
 
-    def test_terminal_normalizes_posix_enter_but_preserves_windows_input(self) -> None:
+    def test_terminal_preserves_windows_input(self) -> None:
         terminal = object.__new__(_TerminalProcess)
         terminal.process = mock.Mock()
         terminal.process.poll.return_value = None
-        for platform, expected in (("posix", b"one\ntwo\nthree\n"), ("nt", b"one\rtwo\r\nthree\n")):
-            with self.subTest(platform=platform), mock.patch("nexus_agent.computer_runtime.os.name", platform):
-                terminal.write("one\rtwo\r\nthree\n")
-                terminal.process.stdin.write.assert_called_with(expected)
+        with mock.patch("nexus_agent.computer_runtime.os.name", "nt"):
+            terminal.write("one\rtwo\r\nthree\n")
+            terminal.process.stdin.write.assert_called_with(b"one\rtwo\r\nthree\n")
 
     def test_terminal_auto_uses_zsh_on_macos_and_preserves_explicit_shells(self) -> None:
         cwd = Path(tempfile.gettempdir())
@@ -828,12 +828,12 @@ class NexusComputerRuntimeTests(unittest.TestCase):
                 with mock.patch("nexus_agent.computer_runtime.os.name", "posix"), mock.patch(
                     "nexus_agent.computer_runtime.platform_module.system", return_value=system
                 ), mock.patch("nexus_agent.computer_runtime.shutil.which", return_value=located) as which, mock.patch(
-                    "nexus_agent.computer_runtime.subprocess.Popen"
-                ) as popen, mock.patch("nexus_agent.computer_runtime.threading.Thread"):
+                    "nexus_agent.computer_runtime._TerminalProcess._start_pty"
+                ) as start_pty, mock.patch("nexus_agent.computer_runtime.threading.Thread"):
                     _TerminalProcess(shell=shell, cwd=cwd)
                 which.assert_called_once_with("zsh" if system == "Darwin" and shell == "auto" else "bash" if shell in {"auto", "bash"} else "sh")
-                self.assertEqual(popen.call_args.args[0], [expected])
-                self.assertTrue(popen.call_args.kwargs["start_new_session"])
+                self.assertEqual(start_pty.call_args.args[0][-1], expected)
+                self.assertTrue(start_pty.call_args.args[0][-2].endswith("_terminal_child.py"))
 
     @unittest.skipUnless(sys.platform == "darwin", "Requires a real macOS zsh")
     def test_macos_default_terminal_executes_zsh_with_browser_enter(self) -> None:
@@ -845,7 +845,7 @@ class NexusComputerRuntimeTests(unittest.TestCase):
                 deadline = time.monotonic() + 5
                 while time.monotonic() < deadline:
                     output += terminal.read(0.1)
-                    if "nexus-zsh:" in output:
+                    if re.search(r"nexus-zsh:\d+\.", output):
                         break
                 self.assertRegex(output, r"nexus-zsh:\d+\.")
             finally:
