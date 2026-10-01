@@ -4,10 +4,10 @@ Build callable Python agents, connect them through Nexus OpenWrt, expose them as
 
 The core SDK has no third-party runtime dependencies. Browser, Computer Runtime, MCP and A2A support are optional installations.
 
-- **Distribution:** `nexus-openwrt-agent-sdk`
+- **Distribution:** [`nexilume`](https://pypi.org/project/nexilume/) (since 0.47.0)
 - **Python import:** `nexus_agent`
 - **Source and downloads:** [GitHub](https://github.com/Nexilume-AI/nexus-agent-sdk-python) · [Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases)
-- **License:** [Apache-2.0](LICENSE)
+- **License:** [Nexus Community License 1.0](LICENSE)
 
 ## Choose your starting point
 
@@ -45,22 +45,26 @@ py -3.12 -m venv .venv
 
 On Ubuntu, install `python3-venv` if creating the environment reports that `ensurepip` is unavailable.
 
-### 2. Install a release wheel
+### 2. Install from PyPI
 
-Download the `.whl` file from [GitHub Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases), then install it in your environment. For release 0.46.5:
+Install the published 0.47.0 release from [PyPI](https://pypi.org/project/nexilume/0.47.0/):
 
 ```sh
-python -m pip install ./nexus_openwrt_agent_sdk-0.46.5-py3-none-any.whl
+python -m pip install nexilume==0.47.0
 python -c "import nexus_agent; print(nexus_agent.__version__)"
 ```
 
-Replace the filename with the wheel you downloaded. This project currently distributes installation packages through GitHub Releases; **PyPI publication is not yet available**. The PyPI package named `nexus-agent-sdk` belongs to a different project.
+Use `python -m pip install --upgrade nexilume` for the latest release. The distribution name is `nexilume`; Python imports remain `nexus_agent`, and commands remain `nexus-computer` and `nexus-agent`. The PyPI package named `nexus-agent-sdk` belongs to a different project.
 
-To include optional features, add extras to the local wheel path:
+For optional features, install only the extras you need:
 
 ```sh
-python -m pip install "./nexus_openwrt_agent_sdk-0.46.5-py3-none-any.whl[computer,browser,fastmcp,a2a]"
+python -m pip install "nexilume[computer,browser,fastmcp,a2a]==0.47.0"
 ```
+
+Migrating from our older `nexus-openwrt-agent-sdk` wheel? In the same environment, run `python -m pip uninstall nexus-openwrt-agent-sdk` **before** installing `nexilume`. Do not keep both distributions installed: they share the same import directory. Keep your Runtime configuration and device keys. See [Computer Runtime upgrade](#upgrade-an-existing-computer-runtime) before restarting an existing service.
+
+For offline installation, download the wheel from [PyPI release files](https://pypi.org/project/nexilume/0.47.0/#files) and use `python -m pip install ./nexilume-0.47.0-py3-none-any.whl`. Optional dependencies must also be available offline. Older wheels remain in [GitHub Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases) for historical use.
 
 | Extra | Enables |
 | --- | --- |
@@ -69,6 +73,7 @@ python -m pip install "./nexus_openwrt_agent_sdk-0.46.5-py3-none-any.whl[compute
 | `fastmcp` | Hosted MCP tools and the FastMCP bridge |
 | `a2a` | Integration with the official A2A SDK |
 | `fastmcp-tasks` | Optional FastMCP Tasks integration |
+| `windows` | Windows service helpers (Windows only) |
 
 ### Install from source instead
 
@@ -313,10 +318,10 @@ When a terminal uses `shell="auto"`, Computer Runtime selects zsh on macOS, bash
 
 ### Upgrade an existing Computer Runtime
 
-Download the 0.46.5 wheel from [GitHub Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases/tag/v0.46.5). Activate the **same virtual environment used to install Runtime**, then run:
+Activate the **same virtual environment used to install Runtime**. If it contains the older `nexus-openwrt-agent-sdk` distribution, uninstall that package first; do not run `nexus-computer unpair` or delete device keys. Then install the current package and restart:
 
 ```sh
-python -m pip install --upgrade "./nexus_openwrt_agent_sdk-0.46.5-py3-none-any.whl[computer,browser]"
+python -m pip install --upgrade "nexilume[computer,browser]==0.47.0"
 nexus-computer restart
 nexus-computer status
 ```
@@ -440,7 +445,7 @@ Examples may require a configured router, Cloud, IPv6 transport or caller permis
 | Symptom | What to check |
 | --- | --- |
 | `nexus-computer` or `nexus-agent` is not found | Activate the virtual environment where you installed the wheel. |
-| An optional module is missing | Install its extra using the wheel path or source checkout. |
+| An optional module is missing | Install its extra, for example `python -m pip install "nexilume[computer,browser]"`, in the active environment. |
 | Router discovery fails | Set `NEXUS_ROUTER_URL` to the configured Agent Access Proxy and check reachability. |
 | Registration works but invocation fails | Verify that the router can reach the agent's advertised host address and port. |
 | Computer stays `reconnecting` | Check `nexus-computer logs`, Cloud availability and TLS trust. |
@@ -456,4 +461,8 @@ When reporting a problem, include your OS, Python version, SDK version, the comm
 
 See [Contributing](https://github.com/Nexilume-AI/nexus-agent-sdk-python/blob/main/CONTRIBUTING.md) for development and testing, [Changelog](https://github.com/Nexilume-AI/nexus-agent-sdk-python/blob/main/CHANGELOG.md) for release history, and [Issues](https://github.com/Nexilume-AI/nexus-agent-sdk-python/issues) for bug reports.
 
-The Apache-2.0 license applies to this SDK. Third-party dependencies retain their own licenses; the SDK license does not cover the private Nexus Enterprise distribution.
+The Nexus Community License 1.0 applies to this SDK. Third-party dependencies retain their own licenses; the SDK license does not cover the private Nexus Enterprise distribution.
+
+### Licensing conditions / 许可条件
+
+Source-available, not unmodified Apache-2.0 or OSI-approved open source. Multi-tenant service operation and removal of existing Nexus UI branding require prior written authorization. Earlier Apache-2.0 grants and third-party licenses remain unchanged. Contributions require explicit agreement permitting commercial use and future relicensing. 许可说明：[LICENSING.md](LICENSING.md)。授权联系：**cary.nexilume@outlook.com**。

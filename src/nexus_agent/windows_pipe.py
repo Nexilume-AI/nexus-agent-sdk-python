@@ -27,7 +27,7 @@ def _pywin32():
         import win32security
     except ImportError as exc:
         raise HostAliasError(
-            "Windows host-alias mode requires: pip install 'nexus-openwrt-agent-sdk[windows]'"
+            "Windows host-alias mode requires: pip install 'nexilume[windows]'"
         ) from exc
     return (
         ntsecuritycon,

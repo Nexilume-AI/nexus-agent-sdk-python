@@ -151,7 +151,7 @@ def CurrentNexusMCP(config: Optional[NexusReportingConfig] = None) -> Any:
     except ImportError as exc:
         raise FastMCPBridgeError(
             "FastMCP support is not installed; install "
-            "'nexus-openwrt-agent-sdk[fastmcp]' on Python 3.10+"
+            "'nexilume[fastmcp]' on Python 3.10+"
         ) from exc
 
     @contextmanager
@@ -180,7 +180,7 @@ def CurrentNexusRun(config: Optional[NexusReportingConfig] = None) -> Any:
     except ImportError as exc:
         raise FastMCPBridgeError(
             "FastMCP support is not installed; install "
-            "'nexus-openwrt-agent-sdk[fastmcp]' on Python 3.10+"
+            "'nexilume[fastmcp]' on Python 3.10+"
         ) from exc
 
     @contextmanager
@@ -480,7 +480,7 @@ class FastMCPBridge:
         except ImportError as exc:
             raise FastMCPBridgeError(
                 "FastMCP support is not installed; install "
-                "'nexus-openwrt-agent-sdk[fastmcp]' on Python 3.10+"
+                "'nexilume[fastmcp]' on Python 3.10+"
             ) from exc
         return Client(mcp)
 
@@ -1022,7 +1022,7 @@ class NexusMCPServer:
         except ImportError as exc:
             raise FastMCPBridgeError(
                 "FastMCP support is not installed; install "
-                "'nexus-openwrt-agent-sdk[fastmcp]' on Python 3.10+"
+                "'nexilume[fastmcp]' on Python 3.10+"
             ) from exc
         self._mcp = FastMCP(name, **options)
         self.legacy_sse = bool(legacy_sse)

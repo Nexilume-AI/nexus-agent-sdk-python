@@ -3,12 +3,12 @@ requires = ["setuptools>=83,<84"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "nexus-openwrt-agent-sdk"
-version = "0.46.5"
-readme = "README.md"
+name = "nexilume"
+version = "0.47.0"
+readme = "README_PYPI.md"
 description = "Python Agent SDK for Nexus OpenWrt and hosted MCP runtimes"
 requires-python = ">=3.9"
-license = "Apache-2.0"
+license = "LicenseRef-Nexus-Community-1.0"
 license-files = ["LICENSE"]
 authors = [{name = "Nexus OpenWrt Team"}]
 dependencies = []

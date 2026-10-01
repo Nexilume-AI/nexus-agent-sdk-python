@@ -55,7 +55,7 @@ def _run_elevated(arguments: Sequence[str]) -> int:
         from win32com.shell import shell, shellcon
     except ImportError as exc:
         raise HostAliasError(
-            "automatic UAC requires: pip install 'nexus-openwrt-agent-sdk[windows]'"
+            "automatic UAC requires: pip install 'nexilume[windows]'"
         ) from exc
     command_line = subprocess.list2cmdline([
         "-m", "nexus_agent.ipv6_cli", *arguments,

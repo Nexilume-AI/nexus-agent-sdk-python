@@ -168,7 +168,7 @@ def _load_a2a() -> Dict[str, Any]:
         from google.protobuf.json_format import MessageToDict, ParseDict
     except ImportError as error:
         raise A2ABridgeError(
-            'A2A integration requires: pip install "nexus-openwrt-agent-sdk[a2a]"'
+            'A2A integration requires: pip install "nexilume[a2a]"'
         ) from error
     return {
         "ServerCallContext": ServerCallContext,

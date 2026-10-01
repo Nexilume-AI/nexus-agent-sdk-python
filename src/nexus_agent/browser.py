@@ -273,7 +273,7 @@ class _BrowserWorker:
                 from playwright.sync_api import sync_playwright
             except ImportError as exc:
                 raise NexusBrowserUnavailable(
-                    "Browser automation requires nexus-openwrt-agent-sdk[browser]"
+                    "Browser automation requires nexilume[browser]"
                 ) from exc
             self.playwright = sync_playwright().start()
             self._launch_browser()

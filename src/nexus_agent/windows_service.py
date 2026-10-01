@@ -109,7 +109,7 @@ def install_service_runtime(root: str = _SERVICE_RUNTIME_ROOT) -> str:
     try:
         venv.EnvBuilder(with_pip=False, symlinks=False).create(staging)
         site_packages = staging / "Lib" / "site-packages"
-        sdk_version = _copy_distribution("nexus-openwrt-agent-sdk", site_packages)
+        sdk_version = _copy_distribution("nexilume", site_packages)
         pywin32_version = _copy_distribution("pywin32", site_packages)
 
         (
@@ -178,7 +178,7 @@ def _require_windows_modules():
         import winreg
     except ImportError as exc:
         raise HostAliasError(
-            "Windows Service support requires: pip install 'nexus-openwrt-agent-sdk[windows]'"
+            "Windows Service support requires: pip install 'nexilume[windows]'"
         ) from exc
     return (
         pywintypes,

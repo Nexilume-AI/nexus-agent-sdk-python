@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.47.0 — 2026-10-01
+
+- Publish the SDK on PyPI as `nexilume`; Python imports remain `nexus_agent`
+  and CLI names, including `nexus-computer`, stay unchanged.
+- Update Runtime self-update, Windows service packaging and optional-dependency
+  installation guidance to use the public distribution name.
+- Use Nexus Community License 1.0 for this new release: multi-tenant service
+  operation and removal of supplied UI branding require written authorization.
+  Earlier Apache-2.0 releases and third-party licenses remain unchanged.
+- Add the prospective contributor agreement and licensing explanation to the
+  source distribution. Commercial contact: cary.nexilume@outlook.com.
+- When migrating from a previous GitHub wheel, uninstall `nexus-openwrt-agent-sdk`
+  before installing `nexilume`; do not install both distributions in the same
+  environment because they provide the same import package.
+
 ## 0.46.5
 
 - Use a real POSIX PTY and an interactive shell for macOS/Linux Computer terminals, restoring the initial prompt, input echo, line editing and Ctrl+C.

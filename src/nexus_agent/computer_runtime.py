@@ -135,7 +135,7 @@ def _require_crypto():
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     except ImportError as exc:
         raise NexusComputerRuntimeError(
-            "Computer Runtime requires: pip install 'nexus-openwrt-agent-sdk[computer]'"
+            "Computer Runtime requires: pip install 'nexilume[computer]'"
         ) from exc
     return serialization, Ed25519PrivateKey
 
@@ -145,7 +145,7 @@ def _require_websockets():
         import websockets
     except ImportError as exc:
         raise NexusComputerRuntimeError(
-            "Computer Runtime requires: pip install 'nexus-openwrt-agent-sdk[computer]'"
+            "Computer Runtime requires: pip install 'nexilume[computer]'"
         ) from exc
     return websockets
 
@@ -295,7 +295,7 @@ def _validated_cloud_origin(value: str) -> str:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
-COMPUTER_USER_AGENT = "Nexus-Computer/0.46.5"
+COMPUTER_USER_AGENT = "Nexus-Computer/0.47.0"
 
 
 def _request_json(
@@ -2261,7 +2261,7 @@ def _main(argv: Optional[Sequence[str]] = None) -> int:
         return 0
     if arguments.command == "update":
         subprocess.run(
-            [sys.executable, "-m", "pip", "install", "--upgrade", "nexus-openwrt-agent-sdk[computer,browser]"],
+            [sys.executable, "-m", "pip", "install", "--upgrade", "nexilume[computer,browser]"],
             check=True,
         )
         runtime.restart_user_service()

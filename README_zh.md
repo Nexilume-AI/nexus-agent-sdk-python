@@ -4,7 +4,9 @@
 
 **Write Python. Publish capabilities. Connect devices.**
 
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-17251d.svg)](LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/nexilume.svg)](https://pypi.org/project/nexilume/)
+[![Python](https://img.shields.io/pypi/pyversions/nexilume.svg)](https://pypi.org/project/nexilume/)
+[![License: Nexus Community](https://img.shields.io/badge/License-Nexus_Community-17251d.svg)](LICENSE)
 [![文档](https://img.shields.io/badge/Read-the_docs-b8ef73.svg)](README_GUIDE.md)
 [![引用项目](https://img.shields.io/badge/Cite-this_software-e8e9e4.svg)](#引用)
 [![Repository checks](https://github.com/Nexilume-AI/nexus-agent-sdk-python/actions/workflows/ci.yml/badge.svg)](https://github.com/Nexilume-AI/nexus-agent-sdk-python/actions/workflows/ci.yml)
@@ -52,15 +54,19 @@
 推荐 Python 3.12；核心运行支持 3.9+，源码构建要求 3.10+，可选依赖可能要求更高版本。
 
 ```sh
-git clone https://github.com/Nexilume-AI/nexus-agent-sdk-python.git
-cd nexus-agent-sdk-python
 python -m venv .venv
 ```
 
-bash/zsh 使用 `source .venv/bin/activate`，Windows PowerShell 使用 `.venv\Scripts\Activate.ps1`。激活后：
+bash/zsh 使用 `source .venv/bin/activate`，Windows PowerShell 使用 `.venv\Scripts\Activate.ps1`。激活后，从 [PyPI 安装 nexilume](https://pypi.org/project/nexilume/)。仅使用核心 SDK：
 
 ```sh
-python -m pip install ".[fastmcp]"
+python -m pip install --upgrade nexilume
+```
+
+下面的 hosted MCP 示例需要 `fastmcp` extra；使用已发布的 0.47.0 版本可复现此示例：
+
+```sh
+python -m pip install "nexilume[fastmcp]==0.47.0"
 ```
 
 保存为 `echo_agent.py`：
@@ -81,13 +87,14 @@ if __name__ == "__main__":
 运行 `python echo_agent.py`。这只启动 hosted runtime，不会自动注册到 Cloud。完整本地请求与预期回复见[本地回环教程](README_GUIDE.md#run-your-first-agent)。
 
 > [!IMPORTANT]
-> 分发名称为 **nexus-openwrt-agent-sdk**，导入名称为 **nexus_agent**。使用源码或 GitHub Release wheel 安装；PyPI 上名为 `nexus-agent-sdk` 的包属于其他项目。
+> PyPI 分发名称为 **nexilume**，导入名称保持 **nexus_agent**。PyPI 上的 `nexus-agent-sdk` 属于其他项目。从旧 GitHub wheel 迁移时，请先在同一环境卸载 `nexus-openwrt-agent-sdk`，避免两个分发包覆盖同一导入目录。
 
 ## 连接 Computer
 
 安装 `computer,browser` extras 和兼容浏览器，在 Cloud 创建 pairing link，再以普通系统用户执行：
 
 ```sh
+python -m pip install "nexilume[computer,browser]==0.47.0"
 nexus-computer setup "<来自自己 Cloud 的 pairing URL>"
 nexus-computer status
 ```
@@ -141,4 +148,8 @@ nexus-computer status
 
 ## 许可证
 
-Nexus 自有代码采用 [Apache-2.0](LICENSE)。第三方组件保留各自许可证与声明；公开文档不授予独立企业版实现的使用权。
+Nexus 自有代码采用 [Nexus Community License 1.0](LICENSE)。第三方组件保留各自许可证与声明；公开文档不授予独立企业版实现的使用权。
+
+### Licensing conditions / 许可条件
+
+Source-available, not unmodified Apache-2.0 or OSI-approved open source. Multi-tenant service operation and removal of existing Nexus UI branding require prior written authorization. Earlier Apache-2.0 grants and third-party licenses remain unchanged. Contributions require explicit agreement permitting commercial use and future relicensing. 许可说明：[LICENSING.md](LICENSING.md)。授权联系：**cary.nexilume@outlook.com**。

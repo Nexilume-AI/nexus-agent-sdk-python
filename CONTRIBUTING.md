@@ -22,7 +22,20 @@ require the respective extras. Hardware, Docker and separate Server integration 
 report explicit skips when their prerequisites are absent. A core test pass is not
 acceptance of those integrations. Tests must not use production credentials or networks.
 
-Changes are licensed under Apache-2.0. By submitting a contribution you confirm you have
-the right to contribute it under that license. Keep dependencies optional where possible.
+Changes require explicit contributor agreement acceptance before merge. Keep dependencies optional where possible.
 
 For the two Server boot integration tests, explicitly set `NEXUS_SERVER_SOURCE` to a separate Server source checkout. Without it those tests skip.
+
+## Contribution licensing
+
+Nexus-authored changes are distributed under the Nexus Community License 1.0.
+Read [LICENSE](LICENSE), [LICENSING.md](LICENSING.md) and the
+[Nexus Contributor License Agreement](CONTRIBUTOR_LICENSE_AGREEMENT.md).
+Every contributing author must explicitly accept that agreement for their PR
+before merge; maintainers must record the acceptance as described there.
+Contributors retain copyright while permitting commercial use, dual licensing
+and future relicensing. Historical contributions and third-party code are not
+automatically subject to the new grant. Preserve all upstream notices.
+
+许可咨询：cary.nexilume@outlook.com。每位贡献者须对本 PR 明确同意贡献者协议；
+仅勾选模板或由维护者代为声明不构成其他作者的同意。

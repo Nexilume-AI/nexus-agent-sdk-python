@@ -4,7 +4,9 @@
 
 **Write Python. Publish capabilities. Connect devices.**
 
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-17251d.svg)](LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/nexilume.svg)](https://pypi.org/project/nexilume/)
+[![Python](https://img.shields.io/pypi/pyversions/nexilume.svg)](https://pypi.org/project/nexilume/)
+[![License: Nexus Community](https://img.shields.io/badge/License-Nexus_Community-17251d.svg)](LICENSE)
 [![Documentation](https://img.shields.io/badge/Read-the_docs-b8ef73.svg)](README_GUIDE.md)
 [![Cite this software](https://img.shields.io/badge/Cite-this_software-e8e9e4.svg)](#citation)
 [![Repository checks](https://github.com/Nexilume-AI/nexus-agent-sdk-python/actions/workflows/ci.yml/badge.svg)](https://github.com/Nexilume-AI/nexus-agent-sdk-python/actions/workflows/ci.yml)
@@ -55,15 +57,19 @@ installation; these Enterprise screenshots do not expand the Community feature s
 Use Python **3.12** for the optional integrations. Core runtime supports Python 3.9+; building from source needs 3.10+. Start in a virtual environment:
 
 ```sh
-git clone https://github.com/Nexilume-AI/nexus-agent-sdk-python.git
-cd nexus-agent-sdk-python
 python -m venv .venv
 ```
 
-Activate with `source .venv/bin/activate` on bash/zsh, or `.venv\Scripts\Activate.ps1` in Windows PowerShell. Then:
+Activate with `source .venv/bin/activate` on bash/zsh, or `.venv\Scripts\Activate.ps1` in Windows PowerShell. Install [nexilume from PyPI](https://pypi.org/project/nexilume/). For the core SDK:
 
 ```sh
-python -m pip install ".[fastmcp]"
+python -m pip install --upgrade nexilume
+```
+
+The hosted MCP example below needs the `fastmcp` extra. Pin the published 0.47.0 release to reproduce it:
+
+```sh
+python -m pip install "nexilume[fastmcp]==0.47.0"
 ```
 
 Save this as `echo_agent.py`:
@@ -84,14 +90,14 @@ if __name__ == "__main__":
 Run `python echo_agent.py` to start hosted mode. Use the [hosted guide](README_GUIDE.md#use-a-hosted-mcp-runtime) to connect/deploy it; running the process alone does not register it in Cloud. For a complete local HTTP request and expected response, use the [local round-trip tutorial](README_GUIDE.md#run-your-first-agent).
 
 > [!IMPORTANT]
-> The distribution is **nexus-openwrt-agent-sdk**, imported as **nexus_agent**. This release guide uses source installs or [GitHub release wheels](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases), not the unrelated PyPI package named `nexus-agent-sdk`.
+> The PyPI distribution is **nexilume**, imported as **nexus_agent**. The unrelated PyPI package `nexus-agent-sdk` is not this SDK. When migrating from an older GitHub wheel, uninstall `nexus-openwrt-agent-sdk` first in the same environment; these distributions share an import namespace.
 
 ## Connect your computer
 
 Install the `computer,browser` extras and a compatible browser, then create a pairing link in your own Cloud installation:
 
 ```sh
-python -m pip install ".[computer,browser]"
+python -m pip install "nexilume[computer,browser]==0.47.0"
 nexus-computer setup "<pairing-url-from-your-cloud>"
 nexus-computer status
 ```
@@ -146,4 +152,8 @@ If this software helps your work, cite the repository and record the exact relea
 
 ## License
 
-Nexus-authored source is distributed under [Apache-2.0](LICENSE). Third-party components retain their own licenses and notices. Documentation does not grant rights to separately distributed Enterprise implementation.
+Nexus-authored source is distributed under [Nexus Community License 1.0](LICENSE). Third-party components retain their own licenses and notices. Documentation does not grant rights to separately distributed Enterprise implementation.
+
+### Licensing conditions / 许可条件
+
+Source-available, not unmodified Apache-2.0 or OSI-approved open source. Multi-tenant service operation and removal of existing Nexus UI branding require prior written authorization. Earlier Apache-2.0 grants and third-party licenses remain unchanged. Contributions require explicit agreement permitting commercial use and future relicensing. 许可说明：[LICENSING.md](LICENSING.md)。授权联系：**cary.nexilume@outlook.com**。
