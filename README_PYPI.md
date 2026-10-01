@@ -13,8 +13,8 @@ Use a virtual environment. The dependency-free core supports Python 3.9+;
 Python 3.12 is recommended for optional integrations.
 
 ```sh
-python -m pip install nexilume==0.47.0
-python -m pip install "nexilume[fastmcp]==0.47.0"
+python -m pip install nexilume==0.47.1
+python -m pip install "nexilume[fastmcp]==0.47.1"
 ```
 
 Use `python -m pip install --upgrade nexilume` to upgrade the core SDK.
@@ -49,7 +49,7 @@ Nexus installation. OpenWrt LAN registration is a separate supported mode.
 ## Computer Runtime
 
 ```sh
-python -m pip install "nexilume[computer,browser]==0.47.0"
+python -m pip install "nexilume[computer,browser]==0.47.1"
 nexus-computer setup "<pairing-url-from-your-cloud>"
 nexus-computer status
 ```
@@ -60,6 +60,14 @@ a compatible local Chromium browser and the `browser` extra. Never share
 pairing links, device keys or tokens.
 
 ## Optional integrations
+
+Dependency fixes in 0.47.1: Computer
+Tool Setup uses `tomli` on Python 3.9/3.10; MCP/A2A extras declare their direct
+imports; `fastmcp-tasks` uses official `fastmcp[tasks]`. See the
+[compatibility guide](https://github.com/Nexilume-AI/nexus-agent-sdk-python/blob/main/README_GUIDE.md#dependency-compatibility).
+Browser/FastMCP/A2A require Python 3.10+; core and Computer support 3.9+.
+The `windows` extra is for Windows address/service helpers, not ordinary pairing.
+Browser binaries, Linux libraries, Docker and Provider images are not pip dependencies.
 
 | Extra | Purpose |
 | --- | --- |
@@ -79,7 +87,7 @@ pairing links, device keys or tokens.
 
 ## License
 
-Version 0.47.0 uses **Nexus Community License 1.0**
+Version 0.47.1 uses **Nexus Community License 1.0**
 (`LicenseRef-Nexus-Community-1.0`), a source-available license, not unmodified
 Apache-2.0 or an OSI-approved open-source license. The complete LICENSE is
 bundled in the wheel and source distribution.

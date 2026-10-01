@@ -19,6 +19,14 @@
 
 </div>
 
+0.47.1 已补齐依赖声明：Computer Tool Setup 在
+Python 3.9/3.10 使用 `tomli`，MCP/A2A 显式声明直接依赖，`fastmcp-tasks`
+安装入口改用官方 `fastmcp[tasks]`。旧版发布文件保持不变。
+核心与 Computer 支持 Python 3.9+，Browser/FastMCP/A2A 需要 3.10+，推荐 3.12。
+Browser 二进制和系统库、Docker 及 Provider 镜像不由 pip 自动安装；
+`windows` extra 用于 Windows 地址/服务辅助功能，普通 Computer 配对不需要它。
+详见[依赖兼容说明](README_GUIDE.md#dependency-compatibility)。
+
 用 Python 构建 Agent、提供 MCP 工具、向 OpenWrt 注册，以及将已授权的 Computer Runtime 连接到 Cloud。
 
 ![Nexus Agent SDK for Python 流程示意图](docs/media/overview.svg)
@@ -63,10 +71,10 @@ bash/zsh 使用 `source .venv/bin/activate`，Windows PowerShell 使用 `.venv\S
 python -m pip install --upgrade nexilume
 ```
 
-下面的 hosted MCP 示例需要 `fastmcp` extra；使用已发布的 0.47.0 版本可复现此示例：
+下面的 hosted MCP 示例需要 `fastmcp` extra；使用 0.47.1 版本可复现此示例：
 
 ```sh
-python -m pip install "nexilume[fastmcp]==0.47.0"
+python -m pip install "nexilume[fastmcp]==0.47.1"
 ```
 
 保存为 `echo_agent.py`：
@@ -94,7 +102,7 @@ if __name__ == "__main__":
 安装 `computer,browser` extras 和兼容浏览器，在 Cloud 创建 pairing link，再以普通系统用户执行：
 
 ```sh
-python -m pip install "nexilume[computer,browser]==0.47.0"
+python -m pip install "nexilume[computer,browser]==0.47.1"
 nexus-computer setup "<来自自己 Cloud 的 pairing URL>"
 nexus-computer status
 ```

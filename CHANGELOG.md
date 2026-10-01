@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.47.1 — 2026-10-01
+
+- Add the conditional `tomli` dependency and parser fallback for Computer Tool Setup on Python 3.9/3.10; the core still has no third-party dependencies.
+- Declare directly used MCP/A2A dependencies in their respective extras. Preserve the `fastmcp-tasks` extra name but use official `fastmcp[tasks]` instead of the unresolvable `fastmcp-tasks<1` requirement.
+- Require Python 3.10+ for the Browser extra through Playwright 1.63+; avoid silently selecting old browser builds and source-only dependencies on Python 3.9. Real browser checks reproduced a slow-page screenshot timeout on 1.61 and passed on 1.63. Core and Computer Runtime retain Python 3.9 support.
+- Check each extra independently and at its declared lower bounds, including Windows helpers and Python 3.9 wheel installs. Browser binary/OS prerequisite checks remain separate from package installation tests.
+
 ## 0.47.0 — 2026-10-01
 
 - Publish the SDK on PyPI as `nexilume`; Python imports remain `nexus_agent`

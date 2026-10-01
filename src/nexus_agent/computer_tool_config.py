@@ -2,7 +2,11 @@
 import hashlib
 import json
 import re
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:
+    # Computer Runtime also supports Python 3.9/3.10; keep the core dependency-free.
+    import tomli as tomllib
 import uuid
 
 

@@ -9,10 +9,10 @@ ROOT = Path(__file__).resolve().parents[1]
 class DistributionIdentityTests(unittest.TestCase):
     def test_version_and_public_identity(self):
         import nexus_agent
-        self.assertEqual(nexus_agent.__version__, '0.47.0')
+        self.assertEqual(nexus_agent.__version__, '0.47.1')
         text = (ROOT / 'pyproject.toml').read_text(encoding='utf-8')
         self.assertIn('name = "nexilume"', text)
-        self.assertIn('version = "0.47.0"', text)
+        self.assertIn('version = "0.47.1"', text)
         self.assertIn('LicenseRef-Nexus-Community-1.0', text)
         self.assertIn('https://github.com/Nexilume-AI/', text)
 

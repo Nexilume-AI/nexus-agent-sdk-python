@@ -54,6 +54,9 @@ installation; these Enterprise screenshots do not expand the Community feature s
 
 ## Quick start
 
+See [dependency compatibility](README_GUIDE.md#dependency-compatibility)
+for supported Python versions, optional extras and OS prerequisites in 0.47.1.
+
 Use Python **3.12** for the optional integrations. Core runtime supports Python 3.9+; building from source needs 3.10+. Start in a virtual environment:
 
 ```sh
@@ -66,10 +69,10 @@ Activate with `source .venv/bin/activate` on bash/zsh, or `.venv\Scripts\Activat
 python -m pip install --upgrade nexilume
 ```
 
-The hosted MCP example below needs the `fastmcp` extra. Pin the published 0.47.0 release to reproduce it:
+The hosted MCP example below needs the `fastmcp` extra. Pin the 0.47.1 release to reproduce it:
 
 ```sh
-python -m pip install "nexilume[fastmcp]==0.47.0"
+python -m pip install "nexilume[fastmcp]==0.47.1"
 ```
 
 Save this as `echo_agent.py`:
@@ -97,7 +100,7 @@ Run `python echo_agent.py` to start hosted mode. Use the [hosted guide](README_G
 Install the `computer,browser` extras and a compatible browser, then create a pairing link in your own Cloud installation:
 
 ```sh
-python -m pip install "nexilume[computer,browser]==0.47.0"
+python -m pip install "nexilume[computer,browser]==0.47.1"
 nexus-computer setup "<pairing-url-from-your-cloud>"
 nexus-computer status
 ```

@@ -1,18 +1,23 @@
 """Reject unexpected wheel payloads and untracked or changed sdist sources."""
 from pathlib import Path
+import argparse
 from email.parser import BytesParser
 import hashlib
 import re
 import tarfile
 import zipfile
 import tomllib
+from packaging.requirements import Requirement
 
 root = Path(__file__).resolve().parents[1]
+parser = argparse.ArgumentParser()
+parser.add_argument('--dist-dir', type=Path, default=root / 'dist')
+args = parser.parse_args()
 project = tomllib.loads((root / 'pyproject.toml').read_text())['project']
 name = project['name'].replace('-', '_')
 version = project['version']
 stem = name + '-' + version
-assert name == 'nexilume' and version == '0.47.0', 'unexpected release identity'
+assert name == 'nexilume' and version == '0.47.1', 'unexpected release identity'
 secret = re.compile(rb'\bpypi-[A-Za-z0-9_-]{80,}|-----BEGIN (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----')
 
 
@@ -27,8 +32,8 @@ def scan_credentials(body, relative):
         body = body.replace(synthetic[relative], b'<invalid-test-key>')
     assert not secret.search(body), 'credential-shaped content: ' + relative
 
-wheel = root / 'dist' / (stem + '-py3-none-any.whl')
-sdist = root / 'dist' / (stem + '.tar.gz')
+wheel = args.dist_dir / (stem + '-py3-none-any.whl')
+sdist = args.dist_dir / (stem + '.tar.gz')
 expected = {p.relative_to(root / 'src').as_posix(): p.read_bytes()
             for p in (root / 'src/nexus_agent').rglob('*.py')}
 prefix = stem + '.dist-info/'
@@ -48,6 +53,13 @@ with zipfile.ZipFile(wheel) as archive:
     assert metadata['Description-Content-Type'] == 'text/markdown'
     assert metadata['Requires-Python'] == project['requires-python']
     assert set(metadata.get_all('Provides-Extra')) == set(project['optional-dependencies'])
+    expected_requires = {str(Requirement(item)) for item in project['dependencies']}
+    for extra, items in project['optional-dependencies'].items():
+        for item in items:
+            dependency, _, marker = item.partition(';')
+            condition = (marker.strip() + ' and ') if marker else ''
+            expected_requires.add(str(Requirement(dependency + '; ' + condition + 'extra == "' + extra + '"')))
+    assert {str(Requirement(item)) for item in metadata.get_all('Requires-Dist', [])} == expected_requires, 'wheel dependencies differ from pyproject'
 with tarfile.open(sdist) as archive:
     seen = set()
     for member in archive.getmembers():

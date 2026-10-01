@@ -47,10 +47,10 @@ On Ubuntu, install `python3-venv` if creating the environment reports that `ensu
 
 ### 2. Install from PyPI
 
-Install the published 0.47.0 release from [PyPI](https://pypi.org/project/nexilume/0.47.0/):
+Install the 0.47.1 release from [PyPI](https://pypi.org/project/nexilume/0.47.1/):
 
 ```sh
-python -m pip install nexilume==0.47.0
+python -m pip install nexilume==0.47.1
 python -c "import nexus_agent; print(nexus_agent.__version__)"
 ```
 
@@ -59,12 +59,12 @@ Use `python -m pip install --upgrade nexilume` for the latest release. The distr
 For optional features, install only the extras you need:
 
 ```sh
-python -m pip install "nexilume[computer,browser,fastmcp,a2a]==0.47.0"
+python -m pip install "nexilume[computer,browser,fastmcp,a2a]==0.47.1"
 ```
 
 Migrating from our older `nexus-openwrt-agent-sdk` wheel? In the same environment, run `python -m pip uninstall nexus-openwrt-agent-sdk` **before** installing `nexilume`. Do not keep both distributions installed: they share the same import directory. Keep your Runtime configuration and device keys. See [Computer Runtime upgrade](#upgrade-an-existing-computer-runtime) before restarting an existing service.
 
-For offline installation, download the wheel from [PyPI release files](https://pypi.org/project/nexilume/0.47.0/#files) and use `python -m pip install ./nexilume-0.47.0-py3-none-any.whl`. Optional dependencies must also be available offline. Older wheels remain in [GitHub Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases) for historical use.
+For offline installation, download the wheel from [PyPI release files](https://pypi.org/project/nexilume/0.47.1/#files) and use `python -m pip install ./nexilume-0.47.1-py3-none-any.whl`. Optional dependencies must also be available offline. Older wheels remain in [GitHub Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases) for historical use.
 
 | Extra | Enables |
 | --- | --- |
@@ -86,6 +86,46 @@ python -m pip install ".[computer,browser,fastmcp,a2a]"
 ```
 
 Use `python -m pip install .` for the core only. Commands below that reference `examples/` run from this repository directory; the wheel does not install the example files into your working directory.
+
+### Dependency compatibility
+
+Version 0.47.1 includes the dependency fixes below. Earlier release files are
+unchanged; upgrade the appropriate extra in your own virtual environment.
+
+| Installation | Python / prerequisites |
+| --- | --- |
+| Core wheel | Python 3.9+; no third-party runtime dependencies |
+| `computer` | Python 3.9+; installs `tomli` below 3.11 for Tool Setup |
+| `browser` | Python 3.10+; Playwright 1.63+; Python 3.12 recommended |
+| `fastmcp`, `fastmcp-tasks`, `a2a` | Python 3.10+; directly imported libraries are declared in each extra |
+| `windows` | Windows only; pywin32 is for address/service helpers, not ordinary Computer Runtime pairing |
+| Source build | Python 3.10+ for the build backend; the resulting core wheel also runs on 3.9 |
+
+`fastmcp-tasks` remains a Nexus extra name. It now installs official
+`fastmcp[tasks]`, not the unresolvable `fastmcp-tasks>=0.1,<1`
+requirement. Native FastMCP Tasks are separate from Nexus `task=True` policy.
+
+Pip installs Python packages, not Docker, Provider images, Chrome, or operating
+system libraries. Browser users still need a supported local browser or
+`python -m playwright install chromium`; Linux may also require
+`python -m playwright install-deps chromium`. These are separate explicit
+installation steps, not actions run automatically by the SDK.
+
+For Windows address/service helpers, install `nexilume[windows]` explicitly.
+Do not add every optional dependency to the core. Libraries use compatible
+version ranges; deployments should lock their resolved environment separately.
+
+From a source checkout, after installing the chosen extra:
+
+```sh
+python -m pip check
+python -I scripts/check_installation.py --extra computer
+```
+
+Replace `computer` with `core`, `browser`, `fastmcp`, `fastmcp-tasks`,
+`a2a` or `windows`. This checks the installed wheel and does not pair a device,
+install a service, launch a browser or modify user configuration. The Browser
+check starts only Playwright's driver; real browser/OS acceptance is separate.
 
 ## Run your first agent
 
@@ -321,7 +361,7 @@ When a terminal uses `shell="auto"`, Computer Runtime selects zsh on macOS, bash
 Activate the **same virtual environment used to install Runtime**. If it contains the older `nexus-openwrt-agent-sdk` distribution, uninstall that package first; do not run `nexus-computer unpair` or delete device keys. Then install the current package and restart:
 
 ```sh
-python -m pip install --upgrade "nexilume[computer,browser]==0.47.0"
+python -m pip install --upgrade "nexilume[computer,browser]==0.47.1"
 nexus-computer restart
 nexus-computer status
 ```
