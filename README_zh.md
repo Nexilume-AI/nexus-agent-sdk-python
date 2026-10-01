@@ -8,7 +8,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/nexilume.svg)](https://pypi.org/project/nexilume/)
 [![License: Nexus Community](https://img.shields.io/badge/License-Nexus_Community-17251d.svg)](LICENSE)
 [![文档](https://img.shields.io/badge/Read-the_docs-b8ef73.svg)](README_GUIDE.md)
-[![引用项目](https://img.shields.io/badge/Cite-this_software-e8e9e4.svg)](#引用)
+[![引用技术报告](https://img.shields.io/badge/Cite-technical_report-e8e9e4.svg)](#引用)
 [![Repository checks](https://github.com/Nexilume-AI/nexus-agent-sdk-python/actions/workflows/ci.yml/badge.svg)](https://github.com/Nexilume-AI/nexus-agent-sdk-python/actions/workflows/ci.yml)
 
 `Python` · `MCP` · `Computer Runtime`
@@ -143,14 +143,20 @@ nexus-computer status
 
 ## 引用
 
-在研究或工程工作中使用 Nexus 时，可以引用对应仓库，并注明实际使用的 release 或 commit。[CITATION.cff](CITATION.cff) 提供机器可读元数据；这是软件引用，不代表已有论文或 DOI。
+如果 Nexus 对你的研究或工程工作有帮助，请引用以下技术报告，而不是软件仓库。[CITATION.cff](CITATION.cff) 的 `preferred-citation` 提供同一报告的机器可读元数据。
+
+Nexilume Research. *Nexus: Operating AI Agents Beyond the Cloud*. 技术报告 NX-SYS-2026-001，v0.56-E3，2026 年 9 月。Research Draft（研究草稿）。
 
 ```bibtex
-@misc{nexus_agent_sdk_python,
-  author       = {{Nexus contributors}},
-  title        = {Nexus Agent SDK for Python},
-  howpublished = {\url{https://github.com/Nexilume-AI/nexus-agent-sdk-python}},
-  note         = {Software; specify the release or commit used}
+@techreport{nexilume2026nexus,
+  author      = {{Nexilume Research}},
+  title       = {{Nexus}: Operating {AI} Agents Beyond the Cloud},
+  institution = {Nexilume Research},
+  type        = {Technical Report},
+  number      = {NX-SYS-2026-001},
+  year        = {2026},
+  month       = sep,
+  note        = {Version v0.56-E3; Research Draft}
 }
 ```
 
