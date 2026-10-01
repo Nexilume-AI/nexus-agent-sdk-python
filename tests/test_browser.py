@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import hashlib
 import os
 from pathlib import Path
@@ -268,6 +269,7 @@ class AgentServingChromeScenarioTest(unittest.TestCase):
         task = frames[0]._task
         self.assertIsNotNone(task)
         image_hashes = set()
+        frame_images = []
         for revision, frame in enumerate(frames, start=1):
             value = frame.data["event"]["value"]
             self.assertEqual(value["revision"], revision)
@@ -276,9 +278,34 @@ class AgentServingChromeScenarioTest(unittest.TestCase):
             self.assertNotIn("nodes", value)
             content = task.asset(value["frame_id"])
             self.assertTrue(content.startswith(b"\xff\xd8\xff"))
-            self.assertGreater(len(content), 5_000)
+            frame_images.append(base64.b64encode(content).decode("ascii"))
             image_hashes.add(hashlib.sha256(content).hexdigest())
         self.assertGreaterEqual(len(image_hashes), 6)
+
+        def decode_frames(worker):
+            # JPEG byte size varies by platform/fonts. Check actual decoded
+            # pixels, not an arbitrary compressed-size threshold.
+            page = worker.browser.new_page()
+            try:
+                return page.evaluate("""async images => {
+                    return Promise.all(images.map(async encoded => {
+                        const response = await fetch('data:image/jpeg;base64,' + encoded);
+                        const image = await createImageBitmap(await response.blob());
+                        try {
+                            const canvas = new OffscreenCanvas(image.width, image.height);
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(image, 0, 0);
+                            const pixels = ctx.getImageData(0, 0, image.width, image.height).data;
+                            const nonuniform = pixels.some((value, i) =>
+                                i % 4 !== 3 && value !== pixels[i % 4]);
+                            return [image.width, image.height, nonuniform];
+                        } finally { image.close(); }
+                    }));
+                }""", frame_images)
+            finally:
+                page.close()
+
+        self.assertEqual(_browser_worker().call(decode_frames), [[900, 640, True]] * 9)
 
     def test_committed_page_remains_usable_when_dom_content_loaded_stalls(self):
         session = NexusBrowserSession(

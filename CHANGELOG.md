@@ -2,6 +2,7 @@
 
 ## 0.47.1 — 2026-10-01
 
+- Verify decoded Browser frame dimensions and nonblank pixels across platforms, instead of assuming JPEG byte size is identical across fonts and operating systems.
 - Add the conditional `tomli` dependency and parser fallback for Computer Tool Setup on Python 3.9/3.10; the core still has no third-party dependencies.
 - Declare directly used MCP/A2A dependencies in their respective extras. Preserve the `fastmcp-tasks` extra name but use official `fastmcp[tasks]` instead of the unresolvable `fastmcp-tasks<1` requirement.
 - Require Python 3.10+ for the Browser extra through Playwright 1.63+; avoid silently selecting old browser builds and source-only dependencies on Python 3.9. Real browser checks reproduced a slow-page screenshot timeout on 1.61 and passed on 1.63. Core and Computer Runtime retain Python 3.9 support.
