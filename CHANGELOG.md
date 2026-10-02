@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Use the heading "Open Source License" and describe a modified version of
+  Apache License 2.0 with additional conditions, without changing the
+  multi-tenant, attribution or contribution conditions. Current-source metadata
+  uses `LicenseRef-Nexus-Additional-Terms-1.0`. Previously published artifacts
+  retain their original license and identifier; do not replace their files.
+
 ## 0.47.1 — 2026-10-01
 
 - Verify decoded Browser frame dimensions and nonblank pixels across platforms, instead of assuming JPEG byte size is identical across fonts and operating systems.

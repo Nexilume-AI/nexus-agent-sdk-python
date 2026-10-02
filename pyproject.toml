@@ -8,7 +8,7 @@ version = "0.47.1"
 readme = "README_PYPI.md"
 description = "Python Agent SDK for Nexus OpenWrt and hosted MCP runtimes"
 requires-python = ">=3.9"
-license = "LicenseRef-Nexus-Community-1.0"
+license = "LicenseRef-Nexus-Additional-Terms-1.0"
 license-files = ["LICENSE"]
 authors = [{name = "Nexus OpenWrt Team"}]
 dependencies = []

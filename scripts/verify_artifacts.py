@@ -49,7 +49,7 @@ with zipfile.ZipFile(wheel) as archive:
     assert archive.read(prefix+'licenses/LICENSE') == (root/'LICENSE').read_bytes()
     metadata = BytesParser().parsebytes(archive.read(prefix+'METADATA'))
     assert metadata['Name'] == project['name'] and metadata['Version'] == version
-    assert metadata['License-Expression'] == 'LicenseRef-Nexus-Community-1.0'
+    assert metadata['License-Expression'] == 'LicenseRef-Nexus-Additional-Terms-1.0'
     assert metadata['Description-Content-Type'] == 'text/markdown'
     assert metadata['Requires-Python'] == project['requires-python']
     assert set(metadata.get_all('Provides-Extra')) == set(project['optional-dependencies'])

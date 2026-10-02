@@ -7,7 +7,7 @@ The core SDK has no third-party runtime dependencies. Browser, Computer Runtime,
 - **Distribution:** [`nexilume`](https://pypi.org/project/nexilume/) (since 0.47.0)
 - **Python import:** `nexus_agent`
 - **Source and downloads:** [GitHub](https://github.com/Nexilume-AI/nexus-agent-sdk-python) · [Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases)
-- **License:** [Nexus Community License 1.0](LICENSE)
+- **License:** [Apache License 2.0 (modified)](LICENSE)
 
 ## Choose your starting point
 
@@ -501,8 +501,8 @@ When reporting a problem, include your OS, Python version, SDK version, the comm
 
 See [Contributing](https://github.com/Nexilume-AI/nexus-agent-sdk-python/blob/main/CONTRIBUTING.md) for development and testing, [Changelog](https://github.com/Nexilume-AI/nexus-agent-sdk-python/blob/main/CHANGELOG.md) for release history, and [Issues](https://github.com/Nexilume-AI/nexus-agent-sdk-python/issues) for bug reports.
 
-The Nexus Community License 1.0 applies to this SDK. Third-party dependencies retain their own licenses; the SDK license does not cover the private Nexus Enterprise distribution.
+The Apache License 2.0 (modified) applies to this SDK. Third-party dependencies retain their own licenses; the SDK license does not cover the private Nexus Enterprise distribution.
 
 ### Licensing conditions
 
-Source-available, not unmodified Apache-2.0 or OSI-approved open source. Multi-tenant service operation and removal of existing Nexus UI branding require prior written authorization. Earlier Apache-2.0 grants and third-party licenses remain unchanged. Contributions require explicit agreement permitting commercial use and future relicensing. See [LICENSING.md](LICENSING.md). Authorization contact: **cary.nexilume@outlook.com**.
+Nexus is licensed under a modified version of the Apache License 2.0, with the following additional conditions. Multi-tenant service operation and removal of existing Nexus UI branding require prior written authorization. Earlier Apache-2.0 grants and third-party licenses remain unchanged. Contributions require explicit agreement permitting commercial use and future relicensing. See [LICENSING.md](LICENSING.md). Authorization contact: **cary.nexilume@outlook.com**.

@@ -6,7 +6,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/nexilume.svg)](https://pypi.org/project/nexilume/)
 [![Python](https://img.shields.io/pypi/pyversions/nexilume.svg)](https://pypi.org/project/nexilume/)
-[![License: Nexus Community](https://img.shields.io/badge/License-Nexus_Community-17251d.svg)](LICENSE)
+[![License: Apache-2.0 modified](https://img.shields.io/badge/License-Apache--2.0_modified-17251d.svg)](LICENSE)
 [![Documentation](https://img.shields.io/badge/Read-the_docs-b8ef73.svg)](README_GUIDE.md)
 [![Cite the technical report](https://img.shields.io/badge/Cite-technical_report-e8e9e4.svg)](#citation)
 [![Repository checks](https://github.com/Nexilume-AI/nexus-agent-sdk-python/actions/workflows/ci.yml/badge.svg)](https://github.com/Nexilume-AI/nexus-agent-sdk-python/actions/workflows/ci.yml)
@@ -161,8 +161,8 @@ Nexilume Research. *Nexus: Operating AI Agents Beyond the Cloud*. Technical Repo
 
 ## License
 
-Nexus-authored source is distributed under [Nexus Community License 1.0](LICENSE). Third-party components retain their own licenses and notices. Documentation does not grant rights to separately distributed Enterprise implementation.
+Nexus-authored source is distributed under [Apache License 2.0 (modified)](LICENSE). Third-party components retain their own licenses and notices. Documentation does not grant rights to separately distributed Enterprise implementation.
 
 ### Licensing conditions
 
-Source-available, not unmodified Apache-2.0 or OSI-approved open source. Multi-tenant service operation and removal of existing Nexus UI branding require prior written authorization. Earlier Apache-2.0 grants and third-party licenses remain unchanged. Contributions require explicit agreement permitting commercial use and future relicensing. See [LICENSING.md](LICENSING.md). Authorization contact: **cary.nexilume@outlook.com**.
+Nexus is licensed under a modified version of the Apache License 2.0, with the following additional conditions. Multi-tenant service operation and removal of existing Nexus UI branding require prior written authorization. Earlier Apache-2.0 grants and third-party licenses remain unchanged. Contributions require explicit agreement permitting commercial use and future relicensing. See [LICENSING.md](LICENSING.md). Authorization contact: **cary.nexilume@outlook.com**.

@@ -87,10 +87,13 @@ Browser binaries, Linux libraries, Docker and Provider images are not pip depend
 
 ## License
 
-Version 0.47.1 uses **Nexus Community License 1.0**
-(`LicenseRef-Nexus-Community-1.0`), a source-available license, not unmodified
+The current source uses **a modified version of the Apache License 2.0, with additional conditions** (`LicenseRef-Nexus-Additional-Terms-1.0`), a source-available license, not unmodified
 Apache-2.0 or an OSI-approved open-source license. The complete LICENSE is
 bundled in the wheel and source distribution.
+
+Already published packages retain their bundled license and identifier. This
+source-tree clarification does not replace the artifacts published as 0.47.1;
+it will be included only in a separately versioned future release.
 
 Personal and single-tenant self-hosted use, including commercial single-tenant
 use, is allowed under the license. Operating a multi-tenant service or removing

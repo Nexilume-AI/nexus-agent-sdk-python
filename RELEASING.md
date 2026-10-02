@@ -41,7 +41,7 @@ version from `https://pypi.org/simple` in a fresh environment. Verify
 artifact hashes, declared extras and the bundled LICENSE. Only then change
 README installation instructions to the public-index command.
 
-The current source carries Nexus Community License 1.0. Complete its rights
+The current source carries Apache License 2.0 (modified). Complete its rights
 review before release, include the contribution agreement in the source archive,
 and choose a new version for a license-changing release; do not overwrite an
 existing Apache-2.0 release or reuse its upload filenames.
