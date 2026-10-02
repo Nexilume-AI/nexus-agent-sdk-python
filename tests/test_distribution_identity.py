@@ -1,5 +1,6 @@
 """The public package rename must include installation and service entry points."""
 import ast
+import re
 from pathlib import Path
 import unittest
 
@@ -14,7 +15,9 @@ class DistributionIdentityTests(unittest.TestCase):
         self.assertIn('name = "nexilume"', text)
         self.assertIn('version = "0.47.1"', text)
         self.assertIn('LicenseRef-Nexus-Additional-Terms-1.0', text)
-        self.assertIn('https://github.com/Nexilume-AI/', text)
+        owners = re.findall(r'https://github\.com/([^/\s"]+)/', text)
+        self.assertTrue(owners, 'Public repository links must be present')
+        self.assertEqual(set(owners), {'Nexilume-AI'})
 
     def test_runtime_update_and_windows_service_target_public_distribution(self):
         for name, expected in (
