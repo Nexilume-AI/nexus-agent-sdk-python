@@ -19,7 +19,7 @@
 
 </div>
 
-0.47.1 已补齐依赖声明：Computer Tool Setup 在
+0.48.0 已补齐依赖声明：Computer Tool Setup 在
 Python 3.9/3.10 使用 `tomli`，MCP/A2A 显式声明直接依赖，`fastmcp-tasks`
 安装入口改用官方 `fastmcp[tasks]`。旧版发布文件保持不变。
 核心与 Computer 支持 Python 3.9+，Browser/FastMCP/A2A 需要 3.10+，推荐 3.12。
@@ -71,10 +71,10 @@ bash/zsh 使用 `source .venv/bin/activate`，Windows PowerShell 使用 `.venv\S
 python -m pip install --upgrade nexilume
 ```
 
-下面的 hosted MCP 示例需要 `fastmcp` extra；使用 0.47.1 版本可复现此示例：
+下面的 hosted MCP 示例需要 `fastmcp` extra；使用 0.48.0 版本可复现此示例：
 
 ```sh
-python -m pip install "nexilume[fastmcp]==0.47.1"
+python -m pip install "nexilume[fastmcp]==0.48.0"
 ```
 
 保存为 `echo_agent.py`：
@@ -102,17 +102,17 @@ if __name__ == "__main__":
 安装 `computer,browser` extras 和兼容浏览器，在 Cloud 创建 pairing link，再以普通系统用户执行：
 
 ```sh
-python -m pip install "nexilume[computer,browser]==0.47.1"
+python -m pip install "nexilume[computer,browser]==0.48.0"
 nexus-computer setup "<来自自己 Cloud 的 pairing URL>"
 nexus-computer status
 ```
 
 等待 `connected`，在 Cloud 中 Attach 并批准任务所需权限。无需开放入站 SSH；不要公开 pairing URL、Token 或设备私钥。
 
-## Attached Computer 二进制文件（待发布）
+## Attached Computer 二进制文件
 
-开发版 SDK 已增加 `ctx.workspace.read_bytes()`、`write_bytes()`、`upload()` 和
-`download()`，均有 `ctx.aio.workspace` 异步对应接口；当前 PyPI 版本尚未包含。
+SDK 0.48.0 已包含 `ctx.workspace.read_bytes()`、`write_bytes()`、`upload()` 和
+`download()`，均有 `ctx.aio.workspace` 异步对应接口。
 需要配套更新 Cloud 与 Computer Runtime，并批准 `files.read` / `files.write`。
 内存读写上限 16 MiB，流式文件上限 1 GiB，256 KiB 分块通过 HTTPS 传输。
 SHA-256 校验通过后才原子替换文件；提交前失败保留原文件。提交响应丢失时

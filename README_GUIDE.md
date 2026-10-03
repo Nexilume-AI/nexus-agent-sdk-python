@@ -47,10 +47,10 @@ On Ubuntu, install `python3-venv` if creating the environment reports that `ensu
 
 ### 2. Install from PyPI
 
-Install the 0.47.1 release from [PyPI](https://pypi.org/project/nexilume/0.47.1/):
+Install the 0.48.0 release from [PyPI](https://pypi.org/project/nexilume/0.48.0/):
 
 ```sh
-python -m pip install nexilume==0.47.1
+python -m pip install nexilume==0.48.0
 python -c "import nexus_agent; print(nexus_agent.__version__)"
 ```
 
@@ -59,12 +59,12 @@ Use `python -m pip install --upgrade nexilume` for the latest release. The distr
 For optional features, install only the extras you need:
 
 ```sh
-python -m pip install "nexilume[computer,browser,fastmcp,a2a]==0.47.1"
+python -m pip install "nexilume[computer,browser,fastmcp,a2a]==0.48.0"
 ```
 
 Migrating from our older `nexus-openwrt-agent-sdk` wheel? In the same environment, run `python -m pip uninstall nexus-openwrt-agent-sdk` **before** installing `nexilume`. Do not keep both distributions installed: they share the same import directory. Keep your Runtime configuration and device keys. See [Computer Runtime upgrade](#upgrade-an-existing-computer-runtime) before restarting an existing service.
 
-For offline installation, download the wheel from [PyPI release files](https://pypi.org/project/nexilume/0.47.1/#files) and use `python -m pip install ./nexilume-0.47.1-py3-none-any.whl`. Optional dependencies must also be available offline. Older wheels remain in [GitHub Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases) for historical use.
+For offline installation, download the wheel from [PyPI release files](https://pypi.org/project/nexilume/0.48.0/#files) and use `python -m pip install ./nexilume-0.48.0-py3-none-any.whl`. Optional dependencies must also be available offline. Older wheels remain in [GitHub Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases) for historical use.
 
 | Extra | Enables |
 | --- | --- |
@@ -89,7 +89,7 @@ Use `python -m pip install .` for the core only. Commands below that reference `
 
 ### Dependency compatibility
 
-Version 0.47.1 includes the dependency fixes below. Earlier release files are
+Version 0.48.0 includes the dependency fixes below. Earlier release files are
 unchanged; upgrade the appropriate extra in your own virtual environment.
 
 | Installation | Python / prerequisites |
@@ -356,11 +356,11 @@ nexus-computer unpair --registration <registration-id>
 
 When a terminal uses `shell="auto"`, Computer Runtime selects zsh on macOS, bash (with sh fallback) on Linux, and PowerShell on Windows. Explicit bash or sh selections on macOS are preserved. SDK 0.46.5 uses a POSIX pseudo-terminal (PTY) with an interactive shell on macOS/Linux, including prompts, input echo, Ctrl+C and terminal resizing. SDK 0.46.4 and earlier use pipes and do not include this PTY fix. Windows retains its existing PowerShell transport. This default requires SDK 0.46.4 or newer and a Cloud server that preserves automatic Runtime shell selection. The 0.46.3 wheel predates this change.
 
-### Attached Computer binary files (next release)
+### Attached Computer binary files
 
-The development SDK and matching Cloud now support binary Workspace files.
-These APIs are not included in the currently published 0.47.1 wheel; both Cloud
-and Computer Runtime must support `workspace.binary.v1` before use.
+SDK 0.48.0 supports binary Workspace files. Both Cloud and Computer Runtime
+must support `workspace.binary.v1` before use; upgrading the SDK alone does not
+add server-side protocol support.
 
 ```python
 data = ctx.workspace.read_bytes("images/input.png")
@@ -393,7 +393,7 @@ published as Run outputs.
 Activate the **same virtual environment used to install Runtime**. If it contains the older `nexus-openwrt-agent-sdk` distribution, uninstall that package first; do not run `nexus-computer unpair` or delete device keys. Then install the current package and restart:
 
 ```sh
-python -m pip install --upgrade "nexilume[computer,browser]==0.47.1"
+python -m pip install --upgrade "nexilume[computer,browser]==0.48.0"
 nexus-computer restart
 nexus-computer status
 ```

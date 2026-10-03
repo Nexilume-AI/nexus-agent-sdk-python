@@ -55,7 +55,7 @@ installation; these Enterprise screenshots do not expand the Community feature s
 ## Quick start
 
 See [dependency compatibility](README_GUIDE.md#dependency-compatibility)
-for supported Python versions, optional extras and OS prerequisites in 0.47.1.
+for supported Python versions, optional extras and OS prerequisites in 0.48.0.
 
 Use Python **3.12** for the optional integrations. Core runtime supports Python 3.9+; building from source needs 3.10+. Start in a virtual environment:
 
@@ -69,10 +69,10 @@ Activate with `source .venv/bin/activate` on bash/zsh, or `.venv\Scripts\Activat
 python -m pip install --upgrade nexilume
 ```
 
-The hosted MCP example below needs the `fastmcp` extra. Pin the 0.47.1 release to reproduce it:
+The hosted MCP example below needs the `fastmcp` extra. Pin the 0.48.0 release to reproduce it:
 
 ```sh
-python -m pip install "nexilume[fastmcp]==0.47.1"
+python -m pip install "nexilume[fastmcp]==0.48.0"
 ```
 
 Save this as `echo_agent.py`:
@@ -100,7 +100,7 @@ Run `python echo_agent.py` to start hosted mode. Use the [hosted guide](README_G
 Install the `computer,browser` extras and a compatible browser, then create a pairing link in your own Cloud installation:
 
 ```sh
-python -m pip install "nexilume[computer,browser]==0.47.1"
+python -m pip install "nexilume[computer,browser]==0.48.0"
 nexus-computer setup "<pairing-url-from-your-cloud>"
 nexus-computer status
 ```
@@ -167,13 +167,13 @@ Nexus-authored source is distributed under [Apache License 2.0 (modified)](LICEN
 
 Nexus is licensed under a modified version of the Apache License 2.0, with the following additional conditions. Multi-tenant service operation and removal of existing Nexus UI branding require prior written authorization. Earlier Apache-2.0 grants and third-party licenses remain unchanged. Contributions require explicit agreement permitting commercial use and future relicensing. See [LICENSING.md](LICENSING.md). Authorization contact: **cary.nexilume@outlook.com**.
 
-## Attached Computer binary files (next release)
+## Attached Computer binary files
 
-The development SDK adds `ctx.workspace.read_bytes()`, `write_bytes()`,
+SDK 0.48.0 adds `ctx.workspace.read_bytes()`, `write_bytes()`,
 `upload()` and `download()`, with async counterparts in `ctx.aio.workspace`.
-These are not in the published wheel yet. Matching Cloud and Computer Runtime
+These APIs are included in 0.48.0. Matching Cloud and Computer Runtime
 updates are required; existing `files.read` / `files.write` authorization applies.
 
 In-memory APIs support up to 16 MiB; streaming APIs up to 1 GiB with bounded
 HTTPS chunks and SHA-256 verification before atomic replacement. No SSH or
-local Agent-host file fallback is used. See the [binary file guide](README_GUIDE.md#attached-computer-binary-files-next-release).
+local Agent-host file fallback is used. See the [binary file guide](README_GUIDE.md#attached-computer-binary-files).
