@@ -1,6 +1,21 @@
 # Changelog
 
-## Unreleased
+## 0.48.0 — 2026-10-03
+
+- Add synchronous and asynchronous binary Workspace APIs: `read_bytes`,
+  `write_bytes`, `upload` and `download`, operating only on the caller's Attached
+  Computer. Cloud and Computer Runtime must both support `workspace.binary.v1`.
+- Bound in-memory transfers to 16 MiB and streamed files to 1 GiB; verify
+  SHA-256 before atomic replacement, preserve existing files on interrupted
+  transfers, enforce Workspace/scope boundaries and expire idle handles.
+- Support Unicode Workspace and Browser names through encoded metadata headers.
+- Use bounded Workspace request timeouts and expose only recognized diagnostic
+  codes, without disclosing remote configuration or file content.
+- Map Mobile operation-journal keys to stable UUID request IDs for retry and
+  recovery compatibility.
+- Use automatic LAN discovery in the binary verification example instead of a
+  machine-specific gateway default. Preserve the existing package/import/CLI
+  names and Computer pairing state during upgrades.
 
 - Use the heading "Open Source License" and describe a modified version of
   Apache License 2.0 with additional conditions, without changing the

@@ -17,7 +17,7 @@ project = tomllib.loads((root / 'pyproject.toml').read_text())['project']
 name = project['name'].replace('-', '_')
 version = project['version']
 stem = name + '-' + version
-assert name == 'nexilume' and version == '0.47.1', 'unexpected release identity'
+assert name == 'nexilume' and version == '0.48.0', 'unexpected release identity'
 secret = re.compile(rb'\bpypi-[A-Za-z0-9_-]{80,}|-----BEGIN (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----')
 
 

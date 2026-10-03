@@ -13,8 +13,8 @@ Use a virtual environment. The dependency-free core supports Python 3.9+;
 Python 3.12 is recommended for optional integrations.
 
 ```sh
-python -m pip install nexilume==0.47.1
-python -m pip install "nexilume[fastmcp]==0.47.1"
+python -m pip install nexilume==0.48.0
+python -m pip install "nexilume[fastmcp]==0.48.0"
 ```
 
 Use `python -m pip install --upgrade nexilume` to upgrade the core SDK.
@@ -49,7 +49,7 @@ Nexus installation. OpenWrt LAN registration is a separate supported mode.
 ## Computer Runtime
 
 ```sh
-python -m pip install "nexilume[computer,browser]==0.47.1"
+python -m pip install "nexilume[computer,browser]==0.48.0"
 nexus-computer setup "<pairing-url-from-your-cloud>"
 nexus-computer status
 ```
@@ -58,6 +58,26 @@ Run as your ordinary OS user. Wait until connected, then attach and authorize
 the Computer in Cloud. No inbound SSH port is needed. Browser control requires
 a compatible local Chromium browser and the `browser` extra. Never share
 pairing links, device keys or tokens.
+
+## Attached Computer binary files
+
+Version 0.48.0 adds synchronous and asynchronous binary Workspace transfers:
+
+```python
+data = ctx.workspace.read_bytes("images/input.png")
+ctx.workspace.write_bytes("images/result.png", data)
+ctx.workspace.upload("/agent-local/result.zip", "exports/result.zip")
+ctx.workspace.download("exports/result.zip", "/agent-local/download.zip")
+```
+
+These operations require a caller-attached Computer and `files.read` /
+`files.write` authorization. Upgrade Cloud and Computer Runtime together to
+support `workspace.binary.v1`; upgrading this package alone cannot add the
+server-side protocol. The SDK never falls back to the Agent host's files.
+In-memory operations are limited to 16 MiB; streamed files to 1 GiB. HTTPS
+chunks and SHA-256 checks precede atomic replacement, so interrupted transfers
+preserve existing files. Use `ctx.aio.workspace` for asynchronous counterparts.
+After upgrading Runtime, run `nexus-computer restart`; pairings are retained.
 
 ## Optional integrations
 
@@ -91,9 +111,9 @@ The current source uses **a modified version of the Apache License 2.0, with add
 Apache-2.0 or an OSI-approved open-source license. The complete LICENSE is
 bundled in the wheel and source distribution.
 
-Already published packages retain their bundled license and identifier. This
-source-tree clarification does not replace the artifacts published as 0.47.1;
-it will be included only in a separately versioned future release.
+Already published packages retain their bundled license and identifier.
+Version 0.48.0 includes this license clarification without replacing any
+earlier release files.
 
 Personal and single-tenant self-hosted use, including commercial single-tenant
 use, is allowed under the license. Operating a multi-tenant service or removing

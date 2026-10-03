@@ -295,7 +295,7 @@ def _validated_cloud_origin(value: str) -> str:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
-COMPUTER_USER_AGENT = "Nexus-Computer/0.47.1"
+COMPUTER_USER_AGENT = "Nexus-Computer/0.48.0"
 
 
 def _request_json(
