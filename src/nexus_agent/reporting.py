@@ -50,6 +50,7 @@ from .workspace import (
     SSHWorkspaceConnectionUpdate,
     WorkspaceEntry,
 )
+from .workspace_files import BinaryWorkspaceMixin
 
 
 class NexusComputerError(RuntimeError):
@@ -391,6 +392,20 @@ def _nexus_response_data(value: Any) -> Dict[str, Any]:
         return {}
     data = value.get("data") if value.get("ok") is True else value
     return dict(data) if isinstance(data, Mapping) else {}
+
+
+def _text_header(headers: Optional[Mapping[str, Any]], name: str) -> str:
+    """Decode an ASCII JSON companion; legacy printable headers still work."""
+    encoded = _header(headers, name + "-Json")
+    if encoded:
+        try:
+            value = json.loads(encoded)
+        except (TypeError, ValueError):
+            raise NexusComputerError("Invalid encoded Nexus text header: " + name) from None
+        if not isinstance(value, str):
+            raise NexusComputerError("Invalid encoded Nexus text header: " + name)
+        return value
+    return _header(headers, name)
 
 
 def _positive_revision(value: Any) -> int:
@@ -1627,7 +1642,11 @@ class _TerminalReporter:
         return self.context._internal_request(self.context.terminal_url, method="GET")
 
 
-class _WorkspaceReporter:
+class _WorkspaceReporter(BinaryWorkspaceMixin):
+    # Cloud waits up to 30 seconds for a Computer command, plus 2 seconds for
+    # result observation. Event delivery's 3-second timeout must not truncate
+    # that bounded operation. Do not retry writes after an ambiguous timeout.
+    _REQUEST_TIMEOUT = 35.0
     def __init__(self, context: "NexusRunContext") -> None:
         self.context = context
 
@@ -1649,7 +1668,10 @@ class _WorkspaceReporter:
         if not self.context.computer_enabled or not self.context.workspace_url:
             raise NexusComputerError("Computer is not enabled for this run")
         query = urlencode({"path": str(path), "operation": operation, "root": root})
-        return self.context._internal_request(self.context.workspace_url + "?" + query, method="GET")
+        return self.context._internal_request(
+            self.context.workspace_url + "?" + query,
+            method="GET", request_timeout=self._REQUEST_TIMEOUT,
+        )
 
     def _write(self, path: str, content: str, *, root: str) -> Dict[str, Any]:
         if not self.context.computer_enabled or not self.context.workspace_url:
@@ -1660,6 +1682,7 @@ class _WorkspaceReporter:
                 self.context.workspace_url,
                 method="POST",
                 payload={**payload, "idempotency_key": idempotency_key},
+                request_timeout=self._REQUEST_TIMEOUT,
             )
         return (
             self.context.recovery.call("workspace.write", payload, invoke, can_reconcile=True)
@@ -1764,7 +1787,13 @@ class _MobileReporter:
         def invoke(idempotency_key: str) -> Dict[str, Any]:
             payload = {
                 **request_payload,
-                "client_request_id": idempotency_key or str(uuid.uuid4()),
+                # Operation journal keys are opaque nxo_* strings; Mobile's
+                # wire contract is UUID. Keep the mapping stable across retry
+                # and process recovery without widening the server API type.
+                "client_request_id": (
+                    str(uuid.uuid5(uuid.NAMESPACE_URL, "nexus.mobile.command:" + idempotency_key))
+                    if idempotency_key else str(uuid.uuid4())
+                ),
             }
             create_deadline = min(deadline, time.monotonic() + 30.0)
             retry_delay = 0.1
@@ -1881,6 +1910,18 @@ class _AsyncWorkspace:
 
     async def write_text(self, path: str, content: str):
         return await asyncio.to_thread(self._sync.write_text, path, content)
+
+    async def read_bytes(self, path: str, *, max_bytes: int = 16 * 1024 * 1024) -> bytes:
+        return await asyncio.to_thread(self._sync.read_bytes, path, max_bytes=max_bytes)
+
+    async def write_bytes(self, path: str, content: bytes):
+        return await asyncio.to_thread(self._sync.write_bytes, path, content)
+
+    async def download(self, path: str, destination: Union[str, Path], *, max_bytes: int = 1024 * 1024 * 1024):
+        return await asyncio.to_thread(self._sync.download, path, destination, max_bytes=max_bytes)
+
+    async def upload(self, source: Union[str, Path], path: str):
+        return await asyncio.to_thread(self._sync.upload, source, path)
 
 
 class _AsyncTerminal:
@@ -2593,8 +2634,8 @@ class NexusRunContext:
             workspace_url=_header(headers, "X-Nexus-Workspace-Url") or str(values.get("NEXUS_WORKSPACE_URL", "")),
             memory_url=_header(headers, "X-Nexus-Memory-Url") or str(values.get("NEXUS_MEMORY_URL", "")),
             workspace_token=_header(headers, "X-Nexus-Workspace-Token") or str(values.get("NEXUS_WORKSPACE_TOKEN", "")),
-            workspace_root=_header(headers, "X-Nexus-Workspace-Root") or str(values.get("NEXUS_WORKSPACE_ROOT", "")),
-            output_root=_header(headers, "X-Nexus-Output-Root") or str(values.get("NEXUS_OUTPUT_ROOT", "")),
+            workspace_root=_text_header(headers, "X-Nexus-Workspace-Root") or str(values.get("NEXUS_WORKSPACE_ROOT", "")),
+            output_root=_text_header(headers, "X-Nexus-Output-Root") or str(values.get("NEXUS_OUTPUT_ROOT", "")),
             workspace_delegate_url=(
                 _header(headers, "X-Nexus-Workspace-Delegate-Url")
                 or str(values.get("NEXUS_WORKSPACE_DELEGATE_URL", ""))
@@ -2624,7 +2665,7 @@ class NexusRunContext:
                 or str(values.get("NEXUS_BROWSER_DELEGATE_TOKEN", ""))
             ),
             browser_computer_name=(
-                _header(headers, "X-Nexus-Browser-Computer-Name")
+                _text_header(headers, "X-Nexus-Browser-Computer-Name")
                 or str(values.get("NEXUS_BROWSER_COMPUTER_NAME", ""))
             ),
             mobile_enabled=(
@@ -3224,7 +3265,19 @@ class NexusRunContext:
                 value = json.loads(raw.decode("utf-8")) if raw else {}
                 return _nexus_response_data(value)
         except HTTPError as exc:
-            raise NexusComputerError("Nexus run endpoint returned HTTP " + str(exc.code)) from None
+            try:
+                value = json.loads(exc.read(65536).decode("utf-8"))
+                error = value.get("error") if isinstance(value, dict) else {}
+                code = str((error or {}).get("code") or "") if isinstance(error, dict) else ""
+            except (ValueError, TypeError, OSError):
+                code = ""
+            finally:
+                exc.close()
+            # Return only recognized diagnostic codes, never arbitrary remote
+            # config, file content, delegate tokens or authorization headers.
+            if not re.fullmatch(r"(?:WORKSPACE|COMPUTER)_[A-Z_]{1,80}", code):
+                code = "WORKSPACE_UNAVAILABLE"
+            raise NexusComputerError("Nexus run endpoint returned HTTP " + str(exc.code) + " (" + code + ")", code=code) from None
         except (URLError, TimeoutError, OSError, ValueError) as exc:
             raise NexusComputerError("Nexus run endpoint is unavailable: " + type(exc).__name__) from None
 

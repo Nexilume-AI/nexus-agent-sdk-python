@@ -109,6 +109,25 @@ nexus-computer status
 
 等待 `connected`，在 Cloud 中 Attach 并批准任务所需权限。无需开放入站 SSH；不要公开 pairing URL、Token 或设备私钥。
 
+## Attached Computer 二进制文件（待发布）
+
+开发版 SDK 已增加 `ctx.workspace.read_bytes()`、`write_bytes()`、`upload()` 和
+`download()`，均有 `ctx.aio.workspace` 异步对应接口；当前 PyPI 版本尚未包含。
+需要配套更新 Cloud 与 Computer Runtime，并批准 `files.read` / `files.write`。
+内存读写上限 16 MiB，流式文件上限 1 GiB，256 KiB 分块通过 HTTPS 传输。
+SHA-256 校验通过后才原子替换文件；提交前失败保留原文件。提交响应丢失时
+先检查目标摘要，不自动重放写入。旧版明确报错，不降级为文本写入。
+
+```python
+data = ctx.workspace.read_bytes("images/input.png")
+ctx.workspace.write_bytes("images/result.png", data)
+ctx.workspace.upload("/agent-local/result.zip", "exports/result.zip")
+ctx.workspace.download("exports/result.zip", "/agent-local/download.zip")
+```
+
+路径限制在调用者 Attached Computer 的 Run Workspace 内，不会直接操作
+Agent 宿主机，也不会自动把文件归档为 Cloud Run Output。
+
 ## 文档
 
 | 目标 | 入口 |

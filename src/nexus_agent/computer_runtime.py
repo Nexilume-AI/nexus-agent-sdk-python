@@ -28,7 +28,7 @@ import time
 from typing import Any, Dict, Mapping, Optional, Sequence, Union
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urljoin, urlsplit
-from urllib.request import HTTPSHandler, ProxyHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, HTTPSHandler, ProxyHandler, Request, build_opener
 import uuid
 
 
@@ -337,6 +337,11 @@ def _request_json(
     return value
 
 
+class _ComputerAssetNoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise NexusComputerRuntimeError("Computer Runtime asset transfers cannot redirect")
+
+
 def _upload_bytes(
     cloud_origin: str,
     endpoint: str,
@@ -361,7 +366,7 @@ def _upload_bytes(
             "Content-Type": str(content_type or "application/octet-stream"),
         },
     )
-    handlers = [ProxyHandler({})]
+    handlers = [ProxyHandler({}), _ComputerAssetNoRedirect()]
     if origin.startswith("https://"):
         handlers.append(HTTPSHandler(context=_ssl_context(ca_file)))
     try:
@@ -374,6 +379,27 @@ def _upload_bytes(
     if not isinstance(value, dict):
         raise NexusComputerRuntimeError("Nexus Cloud returned an invalid Computer Runtime upload response")
     return value
+
+
+def _download_bytes(cloud_origin: str, endpoint: str, *, token: str, ca_file: str = "") -> bytes:
+    from .workspace_files import FILE_CHUNK_BYTES
+
+    origin = _validated_cloud_origin(cloud_origin)
+    parsed = urlsplit(str(endpoint or ""))
+    if parsed.scheme or parsed.netloc or not str(endpoint).startswith("/api/v1/computer-runtime/v1/commands/"):
+        raise NexusComputerRuntimeError("Computer Runtime download endpoint is invalid")
+    handlers = [ProxyHandler({}), _ComputerAssetNoRedirect()]
+    if origin.startswith("https://"):
+        handlers.append(HTTPSHandler(context=_ssl_context(ca_file)))
+    request = Request(urljoin(origin + "/", endpoint.lstrip("/")), headers={"Authorization": f"Bearer {token}"})
+    try:
+        with build_opener(*handlers).open(request, timeout=35) as response:
+            content = response.read(FILE_CHUNK_BYTES + 1)
+        if len(content) > FILE_CHUNK_BYTES:
+            raise NexusComputerRuntimeError("Computer Runtime download exceeded the chunk limit")
+        return content
+    except (HTTPError, URLError, OSError) as exc:
+        raise NexusComputerRuntimeError("Nexus Cloud Computer Runtime download failed") from exc
 
 
 class _TerminalProcess:
@@ -592,6 +618,8 @@ class NexusComputerRuntime:
         self._terminals: Dict[str, _TerminalProcess] = {}
         self._terminal_stream_tasks: Dict[str, asyncio.Task] = {}
         self._browsers: Dict[str, Any] = {}
+        from .computer_files import ComputerFileTransfers
+        self._file_transfers = ComputerFileTransfers(self)
         self._memory_results: Dict[str, tuple[bool, dict[str, Any]]] = self._load_journal_results()
         self._inflight: Dict[str, asyncio.Task] = {}
         self._cancel_events: Dict[str, threading.Event] = {}
@@ -956,6 +984,7 @@ class NexusComputerRuntime:
             browser_available = False
         capabilities = {
             "workspace.v1": 1,
+            "workspace.binary.v1": 1,
             "terminal.v1": 1,
             "terminal.stream.v1": 1,
             "tool_setup.v1": 1,
@@ -1004,6 +1033,8 @@ class NexusComputerRuntime:
             "workspace.list_files": {"files.list"},
             "workspace.read_file": {"files.read"},
             "workspace.write_file": {"files.write"},
+            "workspace.transfer_read": {"files.read"},
+            "workspace.transfer_write": {"files.write"},
             "command.execute": {"command.execute"},
             "terminal.open": {"command.execute"},
             "terminal.read": {"command.execute"},
@@ -1053,6 +1084,11 @@ class NexusComputerRuntime:
         raise RuntimeOperationError("COMPUTER_OPERATION_UNSUPPORTED", "Computer Runtime operation is not supported")
 
     def _workspace(self, operation: str, data: dict[str, Any]) -> dict[str, Any]:
+        if operation in {"workspace.transfer_read", "workspace.transfer_write"}:
+            expected = "read_" if operation.endswith("read") else "write_"
+            if not str(data.get("action") or "").startswith(expected):
+                raise RuntimeOperationError("COMPUTER_SCOPE_MISMATCH", "File transfer action does not match scope")
+            return self._file_transfers.operate(data)
         root = self._resolved_root(str(data.get("workspace_root") or ""))
         path = self._safe_path(str(data.get("path") or "."), root=root)
         if operation == "workspace.ensure_directory":
@@ -1077,7 +1113,8 @@ class NexusComputerRuntime:
             if not path.is_file():
                 raise RuntimeOperationError("WORKSPACE_NOT_FOUND", "Workspace file was not found")
             maximum = max(1, min(int(data.get("max_bytes") or 1048576), MAX_TEXT_RESULT))
-            raw = path.read_bytes()
+            with path.open("rb") as handle:
+                raw = handle.read(maximum + 1)
             if len(raw) > maximum:
                 raise RuntimeOperationError("WORKSPACE_FILE_TOO_LARGE", "Workspace file exceeds the allowed size")
             try:
@@ -1596,6 +1633,7 @@ class NexusComputerRuntime:
         interval = 15
         while True:
             await asyncio.sleep(interval)
+            await asyncio.to_thread(self._file_transfers.expire)
             await self._send(websocket, {"type": "heartbeat", "generation": generation, "load": len(self._memory_results)})
 
     async def _handle_command(self, websocket, command: dict[str, Any]) -> None:
@@ -1760,6 +1798,7 @@ class NexusComputerRuntime:
                     {
                         **(command.get("payload") if isinstance(command.get("payload"), dict) else {}),
                         "_nexus_upload": command.get("upload") if isinstance(command.get("upload"), dict) else {},
+                        "_nexus_download": command.get("download") if isinstance(command.get("download"), dict) else {},
                         "_nexus_command_id": command_id,
                     },
                     cancel_event,
@@ -1800,6 +1839,7 @@ class NexusComputerRuntime:
         _protect_file(self.log_path)
 
     def close(self) -> None:
+        self._file_transfers.close()
         for terminal in list(self._terminals.values()):
             terminal.close()
         self._terminals.clear()

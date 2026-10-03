@@ -356,6 +356,38 @@ nexus-computer unpair --registration <registration-id>
 
 When a terminal uses `shell="auto"`, Computer Runtime selects zsh on macOS, bash (with sh fallback) on Linux, and PowerShell on Windows. Explicit bash or sh selections on macOS are preserved. SDK 0.46.5 uses a POSIX pseudo-terminal (PTY) with an interactive shell on macOS/Linux, including prompts, input echo, Ctrl+C and terminal resizing. SDK 0.46.4 and earlier use pipes and do not include this PTY fix. Windows retains its existing PowerShell transport. This default requires SDK 0.46.4 or newer and a Cloud server that preserves automatic Runtime shell selection. The 0.46.3 wheel predates this change.
 
+### Attached Computer binary files (next release)
+
+The development SDK and matching Cloud now support binary Workspace files.
+These APIs are not included in the currently published 0.47.1 wheel; both Cloud
+and Computer Runtime must support `workspace.binary.v1` before use.
+
+```python
+data = ctx.workspace.read_bytes("images/input.png")
+ctx.workspace.write_bytes("images/result.png", data)
+
+# Stream larger files between the Agent host and the Attached Computer.
+ctx.workspace.upload("/agent-local/result.zip", "exports/result.zip")
+ctx.workspace.download("exports/result.zip", "/agent-local/download.zip")
+
+# Async counterparts use the same authorization and Cloud TLS context.
+data = await ctx.aio.workspace.read_bytes("images/input.png")
+await ctx.aio.workspace.write_bytes("images/result.png", data)
+```
+
+Grant `files.read` / `files.write` and Attach a Computer first. Relative paths
+use the Run's current Workspace folder when a transfer starts; that transfer
+keeps its original directory if the folder changes later. In-memory methods
+are limited to 16 MiB; streaming methods to 1 GiB per file, with 256 KiB chunks.
+SHA-256 is checked before an atomic replacement. Incomplete transfers preserve
+existing files and expire after 15 idle minutes. If the commit response is lost,
+check the target digest before retrying; writes are not automatically replayed.
+After a Runtime restart, start a new transfer.
+
+`ctx.workspace` accesses the Attached Computer. `ctx.files` instead uploads or
+downloads Cloud Run inputs/outputs; Workspace files are not automatically
+published as Run outputs.
+
 ### Upgrade an existing Computer Runtime
 
 Activate the **same virtual environment used to install Runtime**. If it contains the older `nexus-openwrt-agent-sdk` distribution, uninstall that package first; do not run `nexus-computer unpair` or delete device keys. Then install the current package and restart:

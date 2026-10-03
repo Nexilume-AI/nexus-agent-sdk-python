@@ -166,3 +166,14 @@ Nexus-authored source is distributed under [Apache License 2.0 (modified)](LICEN
 ### Licensing conditions
 
 Nexus is licensed under a modified version of the Apache License 2.0, with the following additional conditions. Multi-tenant service operation and removal of existing Nexus UI branding require prior written authorization. Earlier Apache-2.0 grants and third-party licenses remain unchanged. Contributions require explicit agreement permitting commercial use and future relicensing. See [LICENSING.md](LICENSING.md). Authorization contact: **cary.nexilume@outlook.com**.
+
+## Attached Computer binary files (next release)
+
+The development SDK adds `ctx.workspace.read_bytes()`, `write_bytes()`,
+`upload()` and `download()`, with async counterparts in `ctx.aio.workspace`.
+These are not in the published wheel yet. Matching Cloud and Computer Runtime
+updates are required; existing `files.read` / `files.write` authorization applies.
+
+In-memory APIs support up to 16 MiB; streaming APIs up to 1 GiB with bounded
+HTTPS chunks and SHA-256 verification before atomic replacement. No SSH or
+local Agent-host file fallback is used. See the [binary file guide](README_GUIDE.md#attached-computer-binary-files-next-release).
