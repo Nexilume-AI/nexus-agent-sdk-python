@@ -1,14 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.49.0 — 2026-10-04
 
 - Add native Streamable HTTP MCP on public IPv6, with bounded requests,
   authenticated session isolation, cancellation and listener lifecycle guards.
 - Add synchronous/asynchronous Mobile Home, Recents and long-press actions,
   explicit coordinate spaces, capability checks and stale-screen diagnostics.
-- These are current source changes, not a replacement for the published 0.48.0
-  wheel. Android live video likewise requires compatible current Cloud/Web and
-  Android source; the existing beta.2 APK is unchanged.
+- Keep the distribution name `nexilume`, `nexus_agent` imports and existing CLI
+  names. Computer Runtime upgrades preserve pairing and current-user execution.
+- Mobile live video requires compatible Cloud/Web and Android 0.1.2-beta.1 or
+  newer; the SDK controls actions, not video frames. Earlier artifacts remain
+  unchanged.
 
 ## 0.48.0 — 2026-10-03
 

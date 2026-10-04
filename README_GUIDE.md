@@ -47,10 +47,10 @@ On Ubuntu, install `python3-venv` if creating the environment reports that `ensu
 
 ### 2. Install from PyPI
 
-Install the 0.48.0 release from [PyPI](https://pypi.org/project/nexilume/0.48.0/):
+Install the 0.49.0 release from [PyPI](https://pypi.org/project/nexilume/0.49.0/):
 
 ```sh
-python -m pip install nexilume==0.48.0
+python -m pip install nexilume==0.49.0
 python -c "import nexus_agent; print(nexus_agent.__version__)"
 ```
 
@@ -59,12 +59,12 @@ Use `python -m pip install --upgrade nexilume` for the latest release. The distr
 For optional features, install only the extras you need:
 
 ```sh
-python -m pip install "nexilume[computer,browser,fastmcp,a2a]==0.48.0"
+python -m pip install "nexilume[computer,browser,fastmcp,a2a]==0.49.0"
 ```
 
 Migrating from our older `nexus-openwrt-agent-sdk` wheel? In the same environment, run `python -m pip uninstall nexus-openwrt-agent-sdk` **before** installing `nexilume`. Do not keep both distributions installed: they share the same import directory. Keep your Runtime configuration and device keys. See [Computer Runtime upgrade](#upgrade-an-existing-computer-runtime) before restarting an existing service.
 
-For offline installation, download the wheel from [PyPI release files](https://pypi.org/project/nexilume/0.48.0/#files) and use `python -m pip install ./nexilume-0.48.0-py3-none-any.whl`. Optional dependencies must also be available offline. Older wheels remain in [GitHub Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases) for historical use.
+For offline installation, download the wheel from [PyPI release files](https://pypi.org/project/nexilume/0.49.0/#files) and use `python -m pip install ./nexilume-0.49.0-py3-none-any.whl`. Optional dependencies must also be available offline. Older wheels remain in [GitHub Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases) for historical use.
 
 | Extra | Enables |
 | --- | --- |
@@ -348,7 +348,7 @@ def result(arguments):
 
 This source feature requires `agent-adapter 0.6.0-r9` or newer for Direct IPv6,
 and an updated Cloud Relay proxy for Relay. Upgrade the router/Cloud before the
-SDK; it is not yet in the published 0.48.0 wheel. FastMCPBridge preserves native
+SDK. Version 0.49.0 includes this feature. FastMCPBridge preserves native
 results on MCP requests while retaining its direct-Invoke JSON interface.
 `nexus_mcp_result_version` is an internal reserved response field, not an
 application JSON key. Results remain subject to existing response/event limits.
@@ -420,7 +420,7 @@ published as Run outputs.
 Activate the **same virtual environment used to install Runtime**. If it contains the older `nexus-openwrt-agent-sdk` distribution, uninstall that package first; do not run `nexus-computer unpair` or delete device keys. Then install the current package and restart:
 
 ```sh
-python -m pip install --upgrade "nexilume[computer,browser]==0.48.0"
+python -m pip install --upgrade "nexilume[computer,browser]==0.49.0"
 nexus-computer restart
 nexus-computer status
 ```
@@ -577,7 +577,7 @@ This is **direct IPv6 MCP**, not full MCP forwarding through Open Mesh. Mesh
 capability discovery and the existing tool bridge remain separate; resources,
 prompts and bidirectional MCP callbacks are not added to Mesh by this option.
 Native FastMCP Tasks require its task dependencies and backend and are not
-certified by the tests below. This source addition is not in the 0.48.0 release.
+certified by the tests below. Native IPv6 MCP is included starting in 0.49.0.
 
 Reproducible loopback compatibility checks (Python 3.10+, IPv6 enabled):
 

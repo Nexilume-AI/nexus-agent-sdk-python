@@ -13,8 +13,8 @@ Use a virtual environment. The dependency-free core supports Python 3.9+;
 Python 3.12 is recommended for optional integrations.
 
 ```sh
-python -m pip install nexilume==0.48.0
-python -m pip install "nexilume[fastmcp]==0.48.0"
+python -m pip install nexilume==0.49.0
+python -m pip install "nexilume[fastmcp]==0.49.0"
 ```
 
 Use `python -m pip install --upgrade nexilume` to upgrade the core SDK.
@@ -49,7 +49,7 @@ Nexus installation. OpenWrt LAN registration is a separate supported mode.
 ## Computer Runtime
 
 ```sh
-python -m pip install "nexilume[computer,browser]==0.48.0"
+python -m pip install "nexilume[computer,browser]==0.49.0"
 nexus-computer setup "<pairing-url-from-your-cloud>"
 nexus-computer status
 ```

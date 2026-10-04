@@ -10,10 +10,10 @@ ROOT = Path(__file__).resolve().parents[1]
 class DistributionIdentityTests(unittest.TestCase):
     def test_version_and_public_identity(self):
         import nexus_agent
-        self.assertEqual(nexus_agent.__version__, '0.48.0')
+        self.assertEqual(nexus_agent.__version__, '0.49.0')
         text = (ROOT / 'pyproject.toml').read_text(encoding='utf-8')
         self.assertIn('name = "nexilume"', text)
-        self.assertIn('version = "0.48.0"', text)
+        self.assertIn('version = "0.49.0"', text)
         self.assertIn('LicenseRef-Nexus-Additional-Terms-1.0', text)
         owners = re.findall(r'https://github\.com/([^/\s"]+)/', text)
         self.assertTrue(owners, 'Public repository links must be present')

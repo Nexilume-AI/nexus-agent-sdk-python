@@ -4,13 +4,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nexilume"
-version = "0.48.0"
+version = "0.49.0"
 description = "Python Agent SDK for Nexus OpenWrt and hosted MCP runtimes"
+readme = "README_PYPI.md"
 requires-python = ">=3.9"
 license = "LicenseRef-Nexus-Additional-Terms-1.0"
 license-files = ["LICENSE"]
 authors = [{name = "Nexus OpenWrt Team"}]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/Nexilume-AI/nexus-agent-sdk-python"
+Documentation = "https://github.com/Nexilume-AI/nexus-agent-sdk-python/blob/main/README_GUIDE.md"
+Issues = "https://github.com/Nexilume-AI/nexus-agent-sdk-python/issues"
 
 [project.scripts]
 nexus-agent = "nexus_agent.ipv6_cli:main"
