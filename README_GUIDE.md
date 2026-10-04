@@ -328,6 +328,33 @@ For a Nexus Cloud deployment, use [dual_runtime_agent.py](examples/dual_runtime_
 
 The deployment's Python profile must include SDK 0.46.0+ and the `fastmcp` extra. Model credentials, additional dependencies and resource permissions must be configured in that deployment. Hosted mode alone does not grant access to a caller's files or computer.
 
+### Native MCP tool results
+
+Return `McpToolResult` when an edge capability needs native text, image, audio,
+resource or resource-link blocks, structured content, or a business `isError`.
+Ordinary dictionaries keep the existing JSON/text behavior.
+
+```python
+from nexus_agent import McpToolResult
+
+@agent.capability("demo.result")
+def result(arguments):
+    return McpToolResult(
+        content=[{"type": "text", "text": "Completed"}],
+        structured_content={"ok": True},
+        is_error=False,
+    )
+```
+
+This source feature requires `agent-adapter 0.6.0-r9` or newer for Direct IPv6,
+and an updated Cloud Relay proxy for Relay. Upgrade the router/Cloud before the
+SDK; it is not yet in the published 0.48.0 wheel. FastMCPBridge preserves native
+results on MCP requests while retaining its direct-Invoke JSON interface.
+`nexus_mcp_result_version` is an internal reserved response field, not an
+application JSON key. Results remain subject to existing response/event limits.
+OpenWrt's default request limit is 65,536 bytes, including protocol overhead;
+use file references for large data instead of increasing unbounded inline input.
+
 ## Set up Computer Runtime
 
 Computer Runtime runs as your operating-system user and connects outbound to Nexus Cloud over WSS. It does not require an inbound SSH port or a public IP address.
@@ -492,6 +519,112 @@ Public Internet IPv6 ingress, real upstream DHCPv6 and bare-metal Linux acceptan
 
 ## Explore the examples
 
+### Native MCP on per-Agent IPv6 addresses
+
+The source SDK can serve a real FastMCP Streamable HTTP endpoint alongside the
+existing Nexus Invoke endpoint. Install `nexilume[fastmcp]` (FastMCP 3.4.7–3.x)
+and pass a `FastMCP` or `NexusMCPServer` instance:
+
+```python
+from nexus_agent import HmacJwtServerAuth, NexusAgent
+from nexus_agent.fastmcp import NexusMCPServer
+
+mcp = NexusMCPServer("IPv6 Agent")
+
+@mcp.tool
+def echo(message: str) -> dict:
+    return {"echo": message}
+
+# Load the dedicated secret from your private configuration, not source control.
+auth = HmacJwtServerAuth(secret, issuer="urn:example:agents",
+                         audience="agent://demo/echo")
+agent = NexusAgent.public_ipv6(
+    "auto", agent_id="echo", tenant="demo", auth=auth,
+    mcp=mcp, port=9443, mcp_port=9444,
+    cert_file="agent.crt", key_file="agent.key",
+    tls_server_name="echo.example.com", ca_bundle_id="example-ca",
+)
+agent.run()
+```
+
+`auto` uses the existing local addressd service to allocate a host-owned `/128`.
+Both listeners bind **only** that IPv6 address, share the lease, and shut down
+together. `mcp_port` defaults to the Invoke port plus one; omit `mcp` to retain
+the dependency-free, Invoke-only behavior. MCP-only Agents do not need a dummy
+Invoke capability. No Cloud enrollment or OpenWrt forwarding is implied.
+
+- Nexus clients: the unchanged `/agent/v1/invoke` and `/agent/v1/invoke-stream`.
+- Standard FastMCP clients: `agent.mcp_url`, ending in `/mcp`. TLS uses the
+  configured certificate DNS name, which must resolve to the Agent IPv6 address.
+- The native endpoint serves tools, resources, prompts and client callbacks
+  through FastMCP, not `FastMCPBridge`. No tools are implicitly mapped to Invoke.
+- `HmacJwtServerAuth` is reused, including signature, issuer, audience, expiry,
+  scope and listener-tenant checks. Signed source identity identifies the caller.
+  Use a distinct audience per Agent. Session IDs are bound to the authenticated
+  caller and listener; another caller cannot reuse or delete the session.
+- To use FastMCP's own OAuth/auth provider, configure it on the FastMCP instance
+  and explicitly use `auth="none"` for Invoke. This **does not secure Invoke**;
+  expose no Invoke capabilities unless unauthenticated access is intentional.
+  Combining that provider with inherited Nexus JWT is rejected as ambiguous.
+- TLS/client-CA settings apply to both listeners. Clients must trust the CA and
+  validate the hostname. `ca_bundle_id` is an identifier, not automatic CA delivery.
+- MCP request bodies are bounded by `max_request_bytes`. Native responses are
+  streamed by FastMCP; Nexus Invoke's response/event limits and replay store do
+  not apply to MCP. A new connection works after disconnect, but restoring an
+  interrupted response or replaying side effects is not automatic.
+
+This is **direct IPv6 MCP**, not full MCP forwarding through Open Mesh. Mesh
+capability discovery and the existing tool bridge remain separate; resources,
+prompts and bidirectional MCP callbacks are not added to Mesh by this option.
+Native FastMCP Tasks require its task dependencies and backend and are not
+certified by the tests below. This source addition is not in the 0.48.0 release.
+
+Reproducible loopback compatibility checks (Python 3.10+, IPv6 enabled):
+
+```bash
+python -m pip install -r tests/requirements-native-mcp.txt
+python -m unittest discover -s tests -p 'test_public_ipv6_mcp.py' -v
+```
+
+These checks exercise real HTTP, callbacks, mutual Agent calls, JWT isolation,
+cancellation, active-stream shutdown and TLS/mTLS. Native MCP requires
+`mcp>=1.30,<2`, which includes the upstream SSE memory-stream cleanup fix;
+older installed stacks are rejected before opening the listener. Shutdown is
+listener-local: it ends active responses, cancels unfinished tools, and does not
+stop another Agent. Windows retains asynchronous subprocess support. The
+regression checks also reject teardown warnings, leaked transports and incomplete
+HTTP responses; they do not certify all upstream examples or public
+Internet reachability. The existing privileged Windows `/128` acceptance can
+also run native checks with `--native-mcp`; only run it on an authorized test NIC.
+
+### Caller-authorized Mobile actions
+
+Declare the required Mobile scopes, then let the caller attach and authorize a
+paired phone. Both `ctx.mobile` and `ctx.aio.mobile` support observation, capture,
+text/coordinate taps, typing, swipe, Back, Home, recent apps, opening an app and
+waiting for visible text. Home and recent apps use `mobile.press_back` (system
+navigation); long-press uses `mobile.tap`. No additional manifest scopes or
+OpenWrt firmware upgrade are needed for these actions.
+
+```python
+status = ctx.mobile.status()
+if "long_press" in status.supported_actions:
+    ctx.mobile.long_press(x=420, y=860, coordinate_space="pixels", duration_ms=750)
+ctx.mobile.press_home()
+await ctx.aio.mobile.press_recents()
+await ctx.aio.mobile.swipe(0.5, 0.8, 0.5, 0.25, coordinate_space="normalized")
+screen = await ctx.aio.mobile.capture_screen()
+```
+
+Coordinates accept `auto` (the backwards-compatible default), `normalized`
+(`0..1`) or `pixels`. Invalid coordinates and durations are rejected before
+dispatch. New actions require a compatible Nexus Cloud and an Android APK that
+advertises support; old APKs fail explicitly rather than reporting success.
+The status action list is empty on older Clouds that do not advertise it.
+Caller approval, Run ownership and the original scopes are still enforced.
+Live video is managed by Console and Android screen-sharing consent; SDK actions
+use the authorized command channel, not video streaming or automatic consent.
+
 Run these from a source checkout and read each example's configuration before starting it.
 
 | Feature | Example |
@@ -504,6 +637,7 @@ Run these from a source checkout and read each example's configuration before st
 | A2A serving and calling | [a2a_agent.py](examples/a2a_agent.py), [a2a_call.py](examples/a2a_call.py) |
 | Direct IPv6 calls | [direct_ipv6_caller.py](examples/direct_ipv6_caller.py) |
 | Per-agent addresses on a shared host | [host_alias_ipv6_agent.py](examples/host_alias_ipv6_agent.py) |
+| Native MCP and Invoke on one IPv6 address | [public_ipv6_mcp_agent.py](examples/public_ipv6_mcp_agent.py) |
 | Caller-authorized browser control | [browser_session_agent.py](examples/browser_session_agent.py) |
 | Run files and audio | [router_file_audio_agent.py](examples/router_file_audio_agent.py) |
 | Follow-up instructions during a Run | [router_follow_up_agent.py](examples/router_follow_up_agent.py) |

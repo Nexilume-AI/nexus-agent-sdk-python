@@ -5,6 +5,7 @@ import os
 import re
 import socket
 import threading
+import time
 from typing import Any, Callable, Iterable, Optional, Union
 
 from .errors import NexusAgentError
@@ -28,14 +29,34 @@ class PublicIPv6AgentHandle:
         self._lock = threading.Lock()
 
     def wait(self, timeout: Optional[float] = None) -> bool:
-        self.thread.join(timeout)
-        return not self.thread.is_alive()
+        deadline = None if timeout is None else time.monotonic() + timeout
+        while self.thread.is_alive():
+            native = self.owner._mcp_listener
+            lease = self.owner.address_lease
+            if not self._closed and ((native is not None and not native.is_healthy()) or
+                                     (lease is not None and lease.last_error is not None)):
+                self.close()
+                raise NexusAgentError("Agent listener or IPv6 lease is no longer healthy")
+            remaining = None if deadline is None else deadline - time.monotonic()
+            if remaining is not None and remaining <= 0:
+                return False
+            self.thread.join(0.1 if remaining is None else min(0.1, remaining))
+        return True
 
     def close(self) -> None:
         with self._lock:
             if self._closed:
                 return
             self._closed = True
+        # Stop native sessions before relinquishing the shared /128. If shutdown
+        # fails, do not release an address that may still have a live listener.
+        if self.owner._mcp_listener is not None:
+            try:
+                self.owner._mcp_listener.close()
+            except BaseException:
+                with self._lock:
+                    self._closed = False  # Allow retry; retain the lease meanwhile.
+                raise
         if self.thread.is_alive():
             self.owner.server.shutdown()
         self.thread.join(timeout=3.0)
@@ -78,6 +99,8 @@ class PublicIPv6Agent:
         max_stream_event_bytes: int = 65536,
         request_timeout: float = 15.0,
         resumable_streams: bool = True,
+        mcp: Optional[Any] = None,
+        mcp_port: Optional[int] = None,
     ) -> None:
         if not _ID.fullmatch(tenant):
             raise ValueError("tenant must be a safe identifier up to 95 characters")
@@ -88,6 +111,13 @@ class PublicIPv6Agent:
             raise ValueError("address_mode must be auto, existing or host-alias")
         if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
             raise ValueError("port must be between 1 and 65535")
+        if mcp is None and mcp_port is not None:
+            raise ValueError("mcp_port requires an MCP server")
+        if mcp is not None:
+            mcp_port = port + 1 if mcp_port is None else mcp_port
+            if (isinstance(mcp_port, bool) or not isinstance(mcp_port, int) or
+                    not 1 <= mcp_port <= 65535 or mcp_port == port):
+                raise ValueError("mcp_port must be 1..65535 and different from the Invoke port")
         if auth == "none":
             auth_policy: ServerAuthPolicy = NoServerAuth()
         elif isinstance(auth, str):
@@ -96,6 +126,8 @@ class PublicIPv6Agent:
             auth_policy = auth
 
         tls_enabled = bool(cert_file or key_file)
+        if tls_enabled and not (cert_file and key_file):
+            raise ValueError("TLS requires both cert_file and key_file")
         if tls_enabled and (not tls_server_name or not ca_bundle_id):
             raise ValueError(
                 "TLS direct mode requires tls_server_name and ca_bundle_id"
@@ -121,9 +153,9 @@ class PublicIPv6Agent:
             raise ValueError("host-alias mode requires address='auto'")
 
         text = requested_address.strip().strip("[]")
-        if "%" in text:
-            raise ValueError("public IPv6 address must not contain a scope ID")
         try:
+            if "%" in text:
+                raise ValueError("public IPv6 address must not contain a scope ID")
             parsed = ipaddress.ip_address(text)
         except ValueError as exc:
             if self.address_lease is not None:
@@ -139,6 +171,7 @@ class PublicIPv6Agent:
         self.agent_id = agent_id
         self.origin = f"agent://{tenant}/{agent_id}"
         self.auth = auth_policy
+        self._mcp_listener = None
         try:
             self.server = NexusAgentServer(
                 self.address,
@@ -157,9 +190,22 @@ class PublicIPv6Agent:
                 request_timeout=request_timeout,
                 resumable_streams=resumable_streams,
             )
-        except OSError as exc:
+            if mcp is not None:
+                from .public_ipv6_mcp import NativeMCPListener
+
+                self._mcp_listener = NativeMCPListener(
+                    mcp, address=self.address, port=mcp_port, auth=auth_policy,
+                    tenant=tenant, cert_file=cert_file, key_file=key_file,
+                    client_ca_file=client_ca_file, tls_server_name=tls_server_name,
+                    max_request_bytes=max_request_bytes, request_timeout=request_timeout,
+                )
+        except BaseException as exc:
+            if hasattr(self, "server"):
+                self.server.server_close()
             if self.address_lease is not None:
                 self.address_lease.close()
+            if not isinstance(exc, OSError):
+                raise
             if os.name == "nt" and getattr(exc, "winerror", None) == 10013:
                 detail = (
                     "Windows denied the port; check reserved ranges with "
@@ -170,7 +216,7 @@ class PublicIPv6Agent:
                     "confirm the address belongs to this host and the port is unused"
                 )
             raise NexusAgentError(
-                f"cannot bind [{self.address}]:{port}; {detail}"
+                f"cannot initialize IPv6 listener (Invoke {port}, MCP {mcp_port}); {detail}"
             ) from exc
         self.endpoint = PublicAgentEndpoint(
             address=self.address,
@@ -182,6 +228,16 @@ class PublicIPv6Agent:
         self._handle: Optional[PublicIPv6AgentHandle] = None
         self._closed = False
         self._capabilities = set()
+
+    @property
+    def mcp_url(self) -> Optional[str]:
+        """Native MCP URL; TLS uses the certificate's configured DNS identity."""
+        if self._mcp_listener is None:
+            return None
+        host = self.endpoint.tls_server_name or self.address
+        if ":" in host:
+            host = f"[{host.strip('[]')}]"
+        return f"{self.endpoint.scheme}://{host}:{self._mcp_listener.port}/mcp"
 
     @staticmethod
     def _default_agent_id() -> str:
@@ -243,32 +299,37 @@ class PublicIPv6Agent:
             raise NexusAgentError("Agent has been stopped; create a new instance")
         if self._handle is not None:
             raise NexusAgentError("Agent is already running")
-        if not self._capabilities:
+        if not self._capabilities and self._mcp_listener is None:
             raise NexusAgentError("declare at least one capability before start()")
-        thread = self.server.serve_in_thread(daemon=True)
-        if not self.server.is_healthy():
+        thread = None
+        try:
+            if self._mcp_listener is not None:
+                self._mcp_listener.start()
+            thread = self.server.serve_in_thread(daemon=True)
+            if not self.server.is_healthy():
+                raise NexusAgentError("public IPv6 Agent listener did not start")
+            if self.address_lease is not None:
+                self.address_lease.confirm()
+                self.address_lease.start_auto_renew()
+        except BaseException:
+            if self._mcp_listener is not None:
+                self._mcp_listener.close()
+            if thread is not None and thread.is_alive():
+                self.server.shutdown()
+                thread.join(timeout=3.0)
             self.server.server_close()
             if self.address_lease is not None:
                 self.address_lease.close()
             self._closed = True
-            raise NexusAgentError("public IPv6 Agent listener did not start")
-        if self.address_lease is not None:
-            try:
-                self.address_lease.confirm()
-                self.address_lease.start_auto_renew()
-            except BaseException:
-                self.server.shutdown()
-                thread.join(timeout=3.0)
-                self.server.server_close()
-                self.address_lease.close()
-                self._closed = True
-                raise
+            raise
         handle = PublicIPv6AgentHandle(self, thread)
         self._handle = handle
         if announce:
             print_fn("Nexus public IPv6 Agent ready")
             print_fn(f"Agent: {self.origin}")
             print_fn(f"Endpoint: {self.endpoint.url}")
+            if self.mcp_url is not None:
+                print_fn(f"MCP: {self.mcp_url}")
             print_fn(f"Authentication: {self.auth.mode}")
         return handle
 

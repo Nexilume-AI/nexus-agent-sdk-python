@@ -126,6 +126,40 @@ class HmacJwtServerAuth:
         authorization: Optional[str],
         envelope: AgentEnvelope,
     ) -> AuthenticatedCaller:
+        caller = self._verify_token(authorization)
+        if self.bind_tenant and caller.claims.get("tenant") != envelope.tenant:
+            raise ServerAuthenticationError(
+                "CALLER_MISMATCH", "JWT tenant does not match the Envelope", status=403
+            )
+        if self.bind_source_agent and caller.claims.get("source_agent") != envelope.source_agent:
+            raise ServerAuthenticationError(
+                "CALLER_MISMATCH",
+                "JWT source_agent does not match the Envelope",
+                status=403,
+            )
+        return caller
+
+    def authenticate_mcp(
+        self, authorization: Optional[str], *, tenant: str
+    ) -> AuthenticatedCaller:
+        """Authenticate native MCP without inventing an untrusted Envelope.
+
+        The tenant is the listener's configured tenant. The source identity comes
+        exclusively from signed claims, never from HTTP headers or tool arguments.
+        Native MCP always enforces the listener tenant, including when legacy
+        Envelope tenant binding was explicitly disabled.
+        """
+        caller = self._verify_token(authorization)
+        if caller.claims.get("tenant") != tenant:
+            raise ServerAuthenticationError(
+                "CALLER_MISMATCH", "JWT tenant does not match the MCP Agent", status=403
+            )
+        source = caller.claims.get("source_agent")
+        if not isinstance(source, str) or not source or len(source) > 255:
+            raise ServerAuthenticationError("INVALID_TOKEN", "JWT source Agent is required")
+        return caller
+
+    def _verify_token(self, authorization: Optional[str]) -> AuthenticatedCaller:
         if not authorization or not authorization.startswith("Bearer "):
             raise ServerAuthenticationError(
                 "AUTHENTICATION_REQUIRED", "a Bearer JWT is required"
@@ -185,16 +219,6 @@ class HmacJwtServerAuth:
             raise ServerAuthenticationError(
                 "INSUFFICIENT_SCOPE",
                 f"JWT requires scope {self.required_scope}",
-                status=403,
-            )
-        if self.bind_tenant and claims.get("tenant") != envelope.tenant:
-            raise ServerAuthenticationError(
-                "CALLER_MISMATCH", "JWT tenant does not match the Envelope", status=403
-            )
-        if self.bind_source_agent and claims.get("source_agent") != envelope.source_agent:
-            raise ServerAuthenticationError(
-                "CALLER_MISMATCH",
-                "JWT source_agent does not match the Envelope",
                 status=403,
             )
         return AuthenticatedCaller(subject=subject, scopes=scopes, claims=dict(claims))

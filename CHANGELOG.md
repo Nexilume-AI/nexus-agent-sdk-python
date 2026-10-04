@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Add native Streamable HTTP MCP on public IPv6, with bounded requests,
+  authenticated session isolation, cancellation and listener lifecycle guards.
+- Add synchronous/asynchronous Mobile Home, Recents and long-press actions,
+  explicit coordinate spaces, capability checks and stale-screen diagnostics.
+- These are current source changes, not a replacement for the published 0.48.0
+  wheel. Android live video likewise requires compatible current Cloud/Web and
+  Android source; the existing beta.2 APK is unchanged.
+
 ## 0.48.0 — 2026-10-03
 
 - Add synchronous and asynchronous binary Workspace APIs: `read_bytes`,

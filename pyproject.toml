@@ -5,7 +5,6 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nexilume"
 version = "0.48.0"
-readme = "README_PYPI.md"
 description = "Python Agent SDK for Nexus OpenWrt and hosted MCP runtimes"
 requires-python = ">=3.9"
 license = "LicenseRef-Nexus-Additional-Terms-1.0"
@@ -22,12 +21,12 @@ nexus-computer = "nexus_agent.computer_runtime:main"
 
 [project.optional-dependencies]
 fastmcp = [
-    "fastmcp>=3.0,<4", "mcp>=1.24,<2", "pydantic>=2.11.7,<3",
+    "fastmcp>=3.4.7,<4", "mcp>=1.30,<2", "pydantic>=2.11.7,<3",
     "jsonschema>=4.20,<5", "uvicorn>=0.35,<1",
 ]
 # Keep the Nexus extra name; use FastMCP's official task dependencies.
 fastmcp-tasks = [
-    "fastmcp[tasks]>=3.0,<4", "mcp>=1.24,<2", "pydantic>=2.11.7,<3",
+    "fastmcp[tasks]>=3.4.7,<4", "mcp>=1.30,<2", "pydantic>=2.11.7,<3",
     "jsonschema>=4.20,<5", "uvicorn>=0.35,<1",
 ]
 a2a = ["a2a-sdk>=1.1,<2", "httpx>=0.28.1,<1", "protobuf>=5.29.5,<7", "pydantic>=2.11.3,<3"]
@@ -41,8 +40,3 @@ computer = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[project.urls]
-Repository = "https://github.com/Nexilume-AI/nexus-agent-sdk-python"
-Issues = "https://github.com/Nexilume-AI/nexus-agent-sdk-python/issues"
-Changelog = "https://github.com/Nexilume-AI/nexus-agent-sdk-python/blob/main/CHANGELOG.md"

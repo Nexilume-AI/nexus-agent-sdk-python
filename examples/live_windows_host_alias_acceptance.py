@@ -1,6 +1,7 @@
 """Privileged Windows live acceptance for three Agent-owned public /128s."""
 
 import argparse
+import asyncio
 import ipaddress
 import os
 import threading
@@ -25,6 +26,8 @@ def main() -> int:
     parser.add_argument("--interface", required=True)
     parser.add_argument("--prefix", required=True)
     parser.add_argument("--port", type=int, default=20043)
+    parser.add_argument("--native-mcp", action="store_true",
+                        help="Also verify real MCP and Agent-to-Agent calls on each /128")
     arguments = parser.parse_args()
 
     pipe_name = r"\\.\pipe\nexus-addressd-live-" + uuid.uuid4().hex
@@ -70,8 +73,38 @@ def main() -> int:
 
     agents = []
     handles = []
+
+    def make_echo(number):
+        def echo(payload: dict) -> dict:
+            return {"served_by": f"windows-agent-{number}", "echo": payload}
+        return echo
+
+    def make_peer_call(number):
+        async def call_peer(payload: dict) -> dict:
+            from fastmcp import Client
+            from fastmcp.client.transports import StreamableHttpTransport
+            import httpx
+
+            peer = agents[number % 3]
+            peer_token = auth.issue(subject=f"windows-agent-{number}", tenant="live",
+                                    source_agent=f"agent://live/windows-agent-{number}", expires_in=120)
+            transport = StreamableHttpTransport(
+                peer.mcp_url, auth=peer_token,
+                httpx_client_factory=lambda **kw: httpx.AsyncClient(trust_env=False, **kw),
+            )
+            async with Client(transport, timeout=10) as remote:
+                return (await remote.call_tool("echo", {"payload": payload})).data
+        return call_peer
+
     try:
         for number in range(1, 4):
+            echo = make_echo(number)
+            mcp = None
+            if arguments.native_mcp:
+                from nexus_agent.fastmcp import NexusMCPServer
+                mcp = NexusMCPServer(f"Windows IPv6 Agent {number}")
+                mcp.tool(name="echo")(echo)
+                mcp.tool(name="call_peer")(make_peer_call(number))
             agent = NexusAgent.public_ipv6(
                 "auto",
                 address_mode="host-alias",
@@ -83,14 +116,8 @@ def main() -> int:
                 tenant="live",
                 agent_id=f"windows-agent-{number}",
                 port=arguments.port,
+                mcp=mcp,
             )
-
-            def echo(payload, agent_number=number):
-                return {
-                    "served_by": f"windows-agent-{agent_number}",
-                    "echo": payload,
-                }
-
             agent.capability("demo.echo")(echo)
             handles.append(agent.start(announce=False))
             agents.append(agent)
@@ -123,6 +150,30 @@ def main() -> int:
                 source_agent=source_agent,
             )
             print(agent.agent_id, result, flush=True)
+        if arguments.native_mcp:
+            async def check_native():
+                from fastmcp import Client
+                from fastmcp.client.transports import StreamableHttpTransport
+                import httpx
+
+                async def check_one(number, agent):
+                    transport = StreamableHttpTransport(
+                        agent.mcp_url, auth=token,
+                        httpx_client_factory=lambda **kw: httpx.AsyncClient(trust_env=False, **kw),
+                    )
+                    async with Client(transport, timeout=10) as caller:
+                        names = {tool.name for tool in await caller.list_tools()}
+                        assert names == {"echo", "call_peer"}, names
+                        direct = await caller.call_tool("echo", {"payload": {"request": number}})
+                        assert direct.data["served_by"] == agent.agent_id
+                        peer = await caller.call_tool("call_peer", {"payload": {"from": number}})
+                        assert peer.data == {"served_by": f"windows-agent-{number % 3 + 1}",
+                                             "echo": {"from": number}}, peer.data
+                        print("NATIVE_MCP_OK", agent.agent_id, "peer=" + peer.data["served_by"], flush=True)
+
+                await asyncio.gather(*(check_one(i, a) for i, a in enumerate(agents, 1)))
+
+            asyncio.run(check_native())
     finally:
         for handle in reversed(handles):
             try:

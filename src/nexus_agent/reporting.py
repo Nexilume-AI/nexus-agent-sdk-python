@@ -9,6 +9,7 @@ import asyncio
 import base64
 import hashlib
 import json
+import math
 import mimetypes
 import os
 import queue
@@ -18,7 +19,7 @@ import time
 import uuid
 from decimal import Decimal, InvalidOperation
 from pathlib import Path, PurePath
-from typing import Any, Callable, Dict, Iterator, Mapping, Optional, Sequence, Tuple, TypedDict, Union
+from typing import Any, Callable, Dict, Iterable, Iterator, Mapping, Optional, Sequence, Tuple, TypedDict, Union
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
@@ -256,6 +257,7 @@ class NexusMobileStatus:
     platform: str = ""
     status: str = "unavailable"
     capabilities: Tuple[str, ...] = ()
+    supported_actions: Tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -440,12 +442,24 @@ def _json_list(value: Any) -> list[Dict[str, Any]]:
     return [dict(item) for item in parsed[:8] if isinstance(item, Mapping)]
 
 
-def _mobile_coordinate_space(values: Iterable[float]) -> str:
-    """Use normalized coordinates for 0..1 values and pixels otherwise."""
+def _mobile_coordinate_space(values: Iterable[float], coordinate_space: str = "auto") -> str:
+    """Keep legacy inference while allowing explicit, validated coordinates."""
     coordinates = tuple(float(value) for value in values)
-    if any(value < 0 for value in coordinates):
-        raise ValueError("Mobile coordinates must be non-negative")
-    return "pixels" if any(value > 1 for value in coordinates) else "normalized"
+    if coordinate_space not in {"auto", "normalized", "pixels"}:
+        raise ValueError("coordinate_space must be auto, normalized or pixels")
+    if any(not math.isfinite(value) or value < 0 for value in coordinates):
+        raise ValueError("Mobile coordinates must be finite and non-negative")
+    space = ("pixels" if any(value > 1 for value in coordinates) else "normalized") if coordinate_space == "auto" else coordinate_space
+    maximum = 1 if space == "normalized" else 100000
+    if any(value > maximum for value in coordinates):
+        raise ValueError("Mobile coordinates exceed the selected coordinate space")
+    return space
+
+
+def _mobile_duration(value: int, minimum: int) -> int:
+    if type(value) is not int or not minimum <= value <= 5000:
+        raise ValueError(f"duration_ms must be an integer between {minimum} and 5000")
+    return value
 
 
 def _safe_http_error(exc: HTTPError) -> Dict[str, Any]:
@@ -1715,6 +1729,7 @@ class _MobileReporter:
             platform=str(value.get("platform") or ""),
             status=str(value.get("status") or "unavailable"),
             capabilities=tuple(str(item) for item in value.get("capabilities") or ()),
+            supported_actions=tuple(str(item) for item in value.get("supported_actions") or ()),
         )
 
     def observe(self, *, timeout: float = 120.0) -> NexusMobileObservation:
@@ -1738,15 +1753,21 @@ class _MobileReporter:
     def tap_text(self, text: str, *, timeout: float = 120.0) -> NexusMobileCommandResult:
         return self._command("tap_text", {"text": str(text)}, "mobile.tap", timeout=timeout)
 
-    def tap(self, *, x: float, y: float, timeout: float = 120.0) -> NexusMobileCommandResult:
+    def tap(self, *, x: float, y: float, coordinate_space: str = "auto", timeout: float = 120.0) -> NexusMobileCommandResult:
         arguments = {"x": float(x), "y": float(y)}
-        arguments["coordinate_space"] = _mobile_coordinate_space(arguments.values())
+        arguments["coordinate_space"] = _mobile_coordinate_space(arguments.values(), coordinate_space)
         return self._command("tap_coordinates", arguments, "mobile.tap", timeout=timeout)
+
+    def long_press(self, *, x: float, y: float, duration_ms: int = 750, coordinate_space: str = "auto", timeout: float = 120.0) -> NexusMobileCommandResult:
+        arguments = {"x": float(x), "y": float(y)}
+        arguments["coordinate_space"] = _mobile_coordinate_space(arguments.values(), coordinate_space)
+        arguments["duration_ms"] = _mobile_duration(duration_ms, 500)
+        return self._command("long_press", arguments, "mobile.tap", timeout=timeout)
 
     def type_text(self, text: str, *, timeout: float = 120.0) -> NexusMobileCommandResult:
         return self._command("type_text", {"text": str(text)}, "mobile.type_text", timeout=timeout)
 
-    def swipe(self, start_x: float, start_y: float, end_x: float, end_y: float, *, duration_ms: int = 300, timeout: float = 120.0) -> NexusMobileCommandResult:
+    def swipe(self, start_x: float, start_y: float, end_x: float, end_y: float, *, duration_ms: int = 300, coordinate_space: str = "auto", timeout: float = 120.0) -> NexusMobileCommandResult:
         coordinates = {
             "start_x": float(start_x),
             "start_y": float(start_y),
@@ -1757,8 +1778,8 @@ class _MobileReporter:
             "swipe",
             {
                 **coordinates,
-                "coordinate_space": _mobile_coordinate_space(coordinates.values()),
-                "duration_ms": int(duration_ms),
+                "coordinate_space": _mobile_coordinate_space(coordinates.values(), coordinate_space),
+                "duration_ms": _mobile_duration(duration_ms, 50),
             },
             "mobile.swipe",
             timeout=timeout,
@@ -1766,6 +1787,13 @@ class _MobileReporter:
 
     def press_back(self, *, timeout: float = 120.0) -> NexusMobileCommandResult:
         return self._command("press_back", {}, "mobile.press_back", timeout=timeout)
+
+    def press_home(self, *, timeout: float = 120.0) -> NexusMobileCommandResult:
+        """Navigate Home using the existing system-navigation grant."""
+        return self._command("press_home", {}, "mobile.press_back", timeout=timeout)
+
+    def press_recents(self, *, timeout: float = 120.0) -> NexusMobileCommandResult:
+        return self._command("press_recents", {}, "mobile.press_back", timeout=timeout)
 
     def open_app(self, package: str, *, timeout: float = 120.0) -> NexusMobileCommandResult:
         return self._command("open_app", {"package": str(package)}, "mobile.open_app", timeout=timeout)
@@ -2107,13 +2135,16 @@ class _AsyncMobile:
     async def tap_text(self, text: str, *, timeout: float = 120.0) -> NexusMobileCommandResult:
         return await asyncio.to_thread(self._sync.tap_text, text, timeout=timeout)
 
-    async def tap(self, *, x: float, y: float, timeout: float = 120.0) -> NexusMobileCommandResult:
-        return await asyncio.to_thread(self._sync.tap, x=x, y=y, timeout=timeout)
+    async def tap(self, *, x: float, y: float, coordinate_space: str = "auto", timeout: float = 120.0) -> NexusMobileCommandResult:
+        return await asyncio.to_thread(self._sync.tap, x=x, y=y, coordinate_space=coordinate_space, timeout=timeout)
+
+    async def long_press(self, *, x: float, y: float, duration_ms: int = 750, coordinate_space: str = "auto", timeout: float = 120.0) -> NexusMobileCommandResult:
+        return await asyncio.to_thread(self._sync.long_press, x=x, y=y, duration_ms=duration_ms, coordinate_space=coordinate_space, timeout=timeout)
 
     async def type_text(self, text: str, *, timeout: float = 120.0) -> NexusMobileCommandResult:
         return await asyncio.to_thread(self._sync.type_text, text, timeout=timeout)
 
-    async def swipe(self, start_x: float, start_y: float, end_x: float, end_y: float, *, duration_ms: int = 300, timeout: float = 120.0) -> NexusMobileCommandResult:
+    async def swipe(self, start_x: float, start_y: float, end_x: float, end_y: float, *, duration_ms: int = 300, coordinate_space: str = "auto", timeout: float = 120.0) -> NexusMobileCommandResult:
         return await asyncio.to_thread(
             self._sync.swipe,
             start_x,
@@ -2121,11 +2152,18 @@ class _AsyncMobile:
             end_x,
             end_y,
             duration_ms=duration_ms,
+            coordinate_space=coordinate_space,
             timeout=timeout,
         )
 
     async def press_back(self, *, timeout: float = 120.0) -> NexusMobileCommandResult:
         return await asyncio.to_thread(self._sync.press_back, timeout=timeout)
+
+    async def press_home(self, *, timeout: float = 120.0) -> NexusMobileCommandResult:
+        return await asyncio.to_thread(self._sync.press_home, timeout=timeout)
+
+    async def press_recents(self, *, timeout: float = 120.0) -> NexusMobileCommandResult:
+        return await asyncio.to_thread(self._sync.press_recents, timeout=timeout)
 
     async def open_app(self, package: str, *, timeout: float = 120.0) -> NexusMobileCommandResult:
         return await asyncio.to_thread(self._sync.open_app, package, timeout=timeout)
@@ -3088,6 +3126,10 @@ class NexusRunContext:
                 raise NexusMobileBusy("Mobile is being controlled by another Run") from None
             if code == "INTERACTIVE_TRANSPORT_REQUIRED":
                 raise NexusMobileUnavailable("This Mobile action requires SSE or an MCP Task") from None
+            if code == "MOBILE_ACTION_UNSUPPORTED":
+                raise NexusMobileUnavailable("This phone does not support the action; update Nexus Mobile and reconnect") from None
+            if code == "MOBILE_SCREEN_STALE":
+                raise NexusMobileUnavailable("The Mobile screen is stale; capture or observe a fresh screen before retrying") from None
             raise NexusMobileUnavailable("Mobile operation was rejected or unavailable") from None
         except (URLError, TimeoutError, OSError):
             raise _NexusMobileTransportUnavailable(
