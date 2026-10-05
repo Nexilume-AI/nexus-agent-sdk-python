@@ -7,7 +7,7 @@
 [![PyPI](https://img.shields.io/pypi/v/nexilume.svg)](https://pypi.org/project/nexilume/)
 [![Python](https://img.shields.io/pypi/pyversions/nexilume.svg)](https://pypi.org/project/nexilume/)
 [![License: Apache-2.0 modified](https://img.shields.io/badge/License-Apache--2.0_modified-17251d.svg)](LICENSE)
-[![Commercial demo](https://img.shields.io/badge/Demo-Commercial_edition-b8ef73.svg)](https://cloud.nexilume.com/)
+[![Try online](https://img.shields.io/badge/Try-Nexus_Cloud-b8ef73.svg)](https://cloud.nexilume.com/)
 [![Documentation](https://img.shields.io/badge/Read-the_docs-b8ef73.svg)](README_GUIDE.md)
 [![Cite the technical report](https://img.shields.io/badge/Cite-technical_report-e8e9e4.svg)](#citation)
 [![Repository checks](https://github.com/Nexilume-AI/nexus-agent-sdk-python/actions/workflows/ci.yml/badge.svg)](https://github.com/Nexilume-AI/nexus-agent-sdk-python/actions/workflows/ci.yml)
@@ -20,7 +20,7 @@
 
 </div>
 
-> **[Try the Nexus Cloud commercial demo](https://cloud.nexilume.com/)**: Explore the hosted commercial edition. Some features in the demo are not included in the self-hosted Community edition.
+> **[Try Nexus Cloud online](https://cloud.nexilume.com/)**: Explore Nexus Cloud in your browser, or self-host to get started.
 
 Build callable Agents, expose MCP tools, register through OpenWrt, and connect an authorized Computer Runtime to Nexus Cloud.
 
@@ -129,7 +129,7 @@ Windows/Linux/macOS behavior depends on the selected extra, OS and installed bro
 
 | Project | Role | Install separately? |
 | --- | --- | --- |
-| [Cloud Community](https://github.com/Nexilume-AI/nexus-cloud-community) | Server, Web Console and bundled Cloud Relay | Main workspace |
+| [Nexus Cloud](https://github.com/Nexilume-AI/nexus-cloud-community) | Server, Web Console and bundled Cloud Relay | Main workspace |
 | [Python SDK](https://github.com/Nexilume-AI/nexus-agent-sdk-python) | Agent applications and outbound Computer Runtime | Yes |
 | [OpenWrt](https://github.com/Nexilume-AI/nexus-openwrt) | Edge registration and capability routing | Optional |
 | [Mobile](https://github.com/Nexilume-AI/nexus-mobile) | Authorized Android device integration | Optional |
@@ -147,7 +147,7 @@ Follow [SECURITY.md](SECURITY.md) for security reports. Release checks and CI ar
 
 If Nexus supports your research or engineering work, please cite the technical report below, rather than the software repository. [CITATION.cff](CITATION.cff) provides the same report metadata through `preferred-citation`.
 
-Nexilume Research. *Nexus: Operating AI Agents Beyond the Cloud*. Technical Report NX-SYS-2026-001, v0.56-E3, September 2026. Research Draft.
+Nexilume Research. *Nexus: Operating AI Agents Beyond the Cloud*. Technical Report NX-SYS-2026-001, September 2026.
 
 ```bibtex
 @techreport{nexilume2026nexus,
@@ -157,8 +157,7 @@ Nexilume Research. *Nexus: Operating AI Agents Beyond the Cloud*. Technical Repo
   type        = {Technical Report},
   number      = {NX-SYS-2026-001},
   year        = {2026},
-  month       = sep,
-  note        = {Version v0.56-E3; Research Draft}
+  month       = sep
 }
 ```
 

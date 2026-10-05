@@ -7,7 +7,7 @@
 [![PyPI](https://img.shields.io/pypi/v/nexilume.svg)](https://pypi.org/project/nexilume/)
 [![Python](https://img.shields.io/pypi/pyversions/nexilume.svg)](https://pypi.org/project/nexilume/)
 [![License: Apache-2.0 modified](https://img.shields.io/badge/License-Apache--2.0_modified-17251d.svg)](LICENSE)
-[![商业版 Demo](https://img.shields.io/badge/Demo-Commercial_edition-b8ef73.svg)](https://cloud.nexilume.com/)
+[![在线体验](https://img.shields.io/badge/Try-Nexus_Cloud-b8ef73.svg)](https://cloud.nexilume.com/)
 [![文档](https://img.shields.io/badge/Read-the_docs-b8ef73.svg)](README_GUIDE.md)
 [![引用技术报告](https://img.shields.io/badge/Cite-technical_report-e8e9e4.svg)](#引用)
 [![Repository checks](https://github.com/Nexilume-AI/nexus-agent-sdk-python/actions/workflows/ci.yml/badge.svg)](https://github.com/Nexilume-AI/nexus-agent-sdk-python/actions/workflows/ci.yml)
@@ -20,7 +20,7 @@
 
 </div>
 
-> **[体验 Nexus Cloud 商业版 Demo](https://cloud.nexilume.com/)**：这是托管的商业版演示；演示中的部分功能不包含在自托管社区版中。
+> **[在线体验 Nexus Cloud](https://cloud.nexilume.com/)**：在浏览器中探索 Nexus Cloud，也可以自行部署，开始使用。
 
 0.48.0 已补齐依赖声明：Computer Tool Setup 在
 Python 3.9/3.10 使用 `tomli`，MCP/A2A 显式声明直接依赖，`fastmcp-tasks`
@@ -149,7 +149,7 @@ Agent 宿主机，也不会自动把文件归档为 Cloud Run Output。
 
 | 项目 | 职责 |
 | --- | --- |
-| [Cloud Community](https://github.com/Nexilume-AI/nexus-cloud-community) | Server、Web Console 与配套 Cloud Relay |
+| [Nexus Cloud](https://github.com/Nexilume-AI/nexus-cloud-community) | Server、Web Console 与配套 Cloud Relay |
 | [Python SDK](https://github.com/Nexilume-AI/nexus-agent-sdk-python) | Agent 应用与主动出站的 Computer Runtime |
 | [OpenWrt](https://github.com/Nexilume-AI/nexus-openwrt) | 边缘注册、发现与能力路由 |
 | [Mobile](https://github.com/Nexilume-AI/nexus-mobile) | 已授权的 Android 设备接入 |
@@ -167,7 +167,7 @@ Agent 宿主机，也不会自动把文件归档为 Cloud Run Output。
 
 如果 Nexus 对你的研究或工程工作有帮助，请引用以下技术报告，而不是软件仓库。[CITATION.cff](CITATION.cff) 的 `preferred-citation` 提供同一报告的机器可读元数据。
 
-Nexilume Research. *Nexus: Operating AI Agents Beyond the Cloud*. 技术报告 NX-SYS-2026-001，v0.56-E3，2026 年 9 月。Research Draft（研究草稿）。
+Nexilume Research. *Nexus: Operating AI Agents Beyond the Cloud*. 技术报告 NX-SYS-2026-001，2026 年 9 月。
 
 ```bibtex
 @techreport{nexilume2026nexus,
@@ -177,8 +177,7 @@ Nexilume Research. *Nexus: Operating AI Agents Beyond the Cloud*. 技术报告 N
   type        = {Technical Report},
   number      = {NX-SYS-2026-001},
   year        = {2026},
-  month       = sep,
-  note        = {Version v0.56-E3; Research Draft}
+  month       = sep
 }
 ```
 
