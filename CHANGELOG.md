@@ -81,7 +81,7 @@
 - Keep the existing install-then-pair workflow and device configuration during upgrades.
 - Add macOS to the CI matrix and regression tests for headers and terminal input.
 
-Runtime fixes adapted from [Nexus Cloud Community PR #5](https://github.com/Nexilume-AI/nexus-cloud-community/pull/5), without its generated installer or site-packages patches.
+Runtime fixes adapted from [Nexus Cloud Community PR #5](https://github.com/Nexilume-AI/nexus-cloud/pull/5), without its generated installer or site-packages patches.
 
 ## 0.46.2
 
