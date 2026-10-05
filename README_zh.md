@@ -167,12 +167,12 @@ Agent 宿主机，也不会自动把文件归档为 Cloud Run Output。
 
 如果 Nexus 对你的研究或工程工作有帮助，请引用以下技术报告，而不是软件仓库。[CITATION.cff](CITATION.cff) 的 `preferred-citation` 提供同一报告的机器可读元数据。
 
-Nexilume Research. *Nexus: Operating AI Agents Beyond the Cloud*. 技术报告 NX-SYS-2026-001，2026 年 9 月。
+Nexilume Research. *Nexus: An Execution Fabric for AI Agents Across Cloud, Edge, and Devices*. 技术报告 NX-SYS-2026-001，2026 年 9 月。
 
 ```bibtex
 @techreport{nexilume2026nexus,
   author      = {{Nexilume Research}},
-  title       = {{Nexus}: Operating {AI} Agents Beyond the Cloud},
+  title       = {{Nexus}: An Execution Fabric for {AI} Agents Across Cloud, Edge, and Devices},
   institution = {Nexilume Research},
   type        = {Technical Report},
   number      = {NX-SYS-2026-001},
