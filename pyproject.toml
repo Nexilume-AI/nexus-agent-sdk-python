@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nexilume"
-version = "0.49.0"
+version = "0.49.1"
 description = "Python Agent SDK for Nexus OpenWrt and hosted MCP runtimes"
 readme = "README_PYPI.md"
 requires-python = ">=3.9"
@@ -19,7 +19,7 @@ Documentation = "https://github.com/Nexilume-AI/nexus-agent-sdk-python/blob/main
 Issues = "https://github.com/Nexilume-AI/nexus-agent-sdk-python/issues"
 
 [project.scripts]
-nexus-agent = "nexus_agent.ipv6_cli:main"
+nexus-agent = "nexus_agent.runtime_health:main"
 nexus-agent-security = "nexus_agent.security_profile:main"
 nexus-agent-addressd = "nexus_agent.addressd:main"
 nexus-agent-addressd-service = "nexus_agent.windows_service:main"
@@ -29,11 +29,13 @@ nexus-computer = "nexus_agent.computer_runtime:main"
 fastmcp = [
     "fastmcp>=3.4.7,<4", "mcp>=1.30,<2", "pydantic>=2.11.7,<3",
     "jsonschema>=4.20,<5", "uvicorn>=0.35,<1",
+    "griffelib!=2.3.1; python_version < '3.11'",
 ]
 # Keep the Nexus extra name; use FastMCP's official task dependencies.
 fastmcp-tasks = [
     "fastmcp[tasks]>=3.4.7,<4", "mcp>=1.30,<2", "pydantic>=2.11.7,<3",
     "jsonschema>=4.20,<5", "uvicorn>=0.35,<1",
+    "griffelib!=2.3.1; python_version < '3.11'",
 ]
 a2a = ["a2a-sdk>=1.1,<2", "httpx>=0.28.1,<1", "protobuf>=5.29.5,<7", "pydantic>=2.11.3,<3"]
 windows = ["pywin32>=306; platform_system == 'Windows'"]

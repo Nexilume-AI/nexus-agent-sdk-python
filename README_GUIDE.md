@@ -47,10 +47,10 @@ On Ubuntu, install `python3-venv` if creating the environment reports that `ensu
 
 ### 2. Install from PyPI
 
-Install the 0.49.0 release from [PyPI](https://pypi.org/project/nexilume/0.49.0/):
+Install the 0.49.1 release from [PyPI](https://pypi.org/project/nexilume/0.49.1/):
 
 ```sh
-python -m pip install nexilume==0.49.0
+python -m pip install nexilume==0.49.1
 python -c "import nexus_agent; print(nexus_agent.__version__)"
 ```
 
@@ -59,12 +59,12 @@ Use `python -m pip install --upgrade nexilume` for the latest release. The distr
 For optional features, install only the extras you need:
 
 ```sh
-python -m pip install "nexilume[computer,browser,fastmcp,a2a]==0.49.0"
+python -m pip install "nexilume[computer,browser,fastmcp,a2a]==0.49.1"
 ```
 
 Migrating from our older `nexus-openwrt-agent-sdk` wheel? In the same environment, run `python -m pip uninstall nexus-openwrt-agent-sdk` **before** installing `nexilume`. Do not keep both distributions installed: they share the same import directory. Keep your Runtime configuration and device keys. See [Computer Runtime upgrade](#upgrade-an-existing-computer-runtime) before restarting an existing service.
 
-For offline installation, download the wheel from [PyPI release files](https://pypi.org/project/nexilume/0.49.0/#files) and use `python -m pip install ./nexilume-0.49.0-py3-none-any.whl`. Optional dependencies must also be available offline. Older wheels remain in [GitHub Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases) for historical use.
+For offline installation, download the wheel from [PyPI release files](https://pypi.org/project/nexilume/0.49.1/#files) and use `python -m pip install ./nexilume-0.49.1-py3-none-any.whl`. Optional dependencies must also be available offline. Older wheels remain in [GitHub Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases) for historical use.
 
 | Extra | Enables |
 | --- | --- |
@@ -74,6 +74,30 @@ For offline installation, download the wheel from [PyPI release files](https://p
 | `a2a` | Integration with the official A2A SDK |
 | `fastmcp-tasks` | Optional FastMCP Tasks integration |
 | `windows` | Windows service helpers (Windows only) |
+
+### Diagnose and recover an MCP environment
+
+Version 0.49.1 includes a bounded dependency recovery launcher:
+
+```sh
+nexus-agent doctor
+nexus-agent repair --yes
+nexus-agent run --repair agent.py
+```
+
+`doctor` checks the real FastMCP imports in a fresh process. `repair --yes`
+repairs recognized dependency problems in the current virtual environment or
+user installation, then verifies again. For example, it identifies the
+Python 3.10 / `griffelib 2.3.1` `StrEnum` failure instead of reporting missing
+server support, and selects the verified compatible dependency.
+
+`run --repair` opts into that same check and recovery **before** executing the
+Agent. A healthy environment is unchanged. There is only one repair attempt;
+unknown failures stop with an actionable diagnostic. Once the Agent starts,
+its failure is returned to the caller, never automatically replayed. Ordinary
+SDK imports never install packages. No system Python, firewall, DAD or address
+service configuration is changed. Use `nexus-agent ipv6 doctor` and the existing
+administrator-approved `nexus-agent ipv6 setup` separately for address services.
 
 ### Install from source instead
 
@@ -420,7 +444,7 @@ published as Run outputs.
 Activate the **same virtual environment used to install Runtime**. If it contains the older `nexus-openwrt-agent-sdk` distribution, uninstall that package first; do not run `nexus-computer unpair` or delete device keys. Then install the current package and restart:
 
 ```sh
-python -m pip install --upgrade "nexilume[computer,browser]==0.49.0"
+python -m pip install --upgrade "nexilume[computer,browser]==0.49.1"
 nexus-computer restart
 nexus-computer status
 ```
@@ -461,6 +485,63 @@ nexus-computer restart
 ```
 
 Installing the Playwright Python package alone does not install a browser. An environment variable set only in an interactive shell does not update an already running systemd service.
+
+## Configure Agent IPv6 on Windows
+
+Install `nexilume[windows]`, then run `nexus-agent ipv6 setup` and
+`nexus-agent ipv6 doctor`. Setup requests administrator approval for the address
+service; ordinary Agents use its restricted named pipe, not administrator rights.
+Use only an IPv6 prefix routed or delegated to your deployment.
+
+Windows readiness checks query the exact interface and address through IP Helper,
+independently of the system language. The service waits for `Preferred`, then
+checks local socket binding. An unrelated duplicate address on the same adapter
+does not fail this lease. No DAD or firewall protection is disabled.
+
+Address allocation automatically recovers from an OS-confirmed DAD conflict:
+addressd removes only its failed `/128`, verifies cleanup, then tries the next
+deterministic candidate. One request attempts at most three addresses and stops
+starting recovery attempts after a 10-second recovery window. Each backend
+operation also has its own bounded timeout. Conflicting candidates are avoided
+for five minutes in a bounded, memory-only cache. Active leases and addresses
+created outside addressd are never removed to make room.
+
+Recovery does not retry permission errors, missing interfaces, DAD timeouts or
+failed cleanup. If the gateway rejects multiple candidates (for example, due to
+an NDP proxy policy), fix that network condition; disabling DAD is not a remedy.
+The allocator runs in the address service: after upgrading the SDK, update and
+restart the installed address service as well, once Agent leases are released.
+
+Failures distinguish:
+
+| Error | Meaning / next check |
+| --- | --- |
+| `IPV6_DAD_DUPLICATE` | Windows detected a conflict for this address. Check the address allocation and network. |
+| `IPV6_DAD_RETRY_EXHAUSTED` | Automatic reallocation reached its attempt/time limit. Failed addresses were cleaned up; check gateway NDP/proxy policy and the on-link prefix. |
+| `IPV6_DAD_CLEANUP_FAILED` | A conflicted address remains after rollback. Recovery stopped without modifying any other address. |
+| `IPV6_DAD_TIMEOUT` | This address is still `Tentative`. Check the selected adapter and link stability. |
+| `IPV6_BIND_FAILED` | DAD completed but socket creation or binding failed. The original Windows error is included; `10013` is access denied, not a DAD timeout. |
+| `IPV6_BIND_TIMEOUT` | DAD completed but Windows still reports `10049` (address not available) after the bounded retry. |
+| `IPV6_ADDRESS_NOT_READY` / `IPV6_ADDRESS_UNUSABLE` | The new address is missing or has an unusable state on the selected adapter. |
+| `IPV6_STATE_QUERY_FAILED` | Windows could not query the address; inspect the included OS error. |
+
+Failed readiness checks remove only the newly added address. If cleanup also
+fails, the error preserves the original cause and reports the cleanup failure.
+A successful check proves local readiness, not inbound Internet reachability.
+
+**Updating an existing Windows service:** addressd runs an isolated, protected
+copy of the SDK. After installing a fixed wheel into Python, stop Agent processes
+and run the following in an administrator PowerShell using that same Python:
+
+```powershell
+python -m nexus_agent.windows_service stop
+python -m nexus_agent.windows_service update
+python -m nexus_agent.windows_service start
+nexus-agent ipv6 doctor
+```
+
+This refreshes the service code without resetting its configured interface,
+prefix or access policy. Restarting the old service alone does not copy SDK fixes.
 
 ## Configure Agent IPv6 on Linux
 

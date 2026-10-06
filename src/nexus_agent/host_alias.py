@@ -19,10 +19,18 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Protocol, Tuple
 from .errors import NexusAgentError
 
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9._~-]{0,93}[A-Za-z0-9])?$")
+_DAD_MAX_ATTEMPTS = 3
+_DAD_RETRY_WINDOW_SECONDS = 10.0
+_DAD_QUARANTINE_SECONDS = 300.0
+_DAD_QUARANTINE_LIMIT = 1024
 
 
 class HostAliasError(NexusAgentError):
     """A bounded local IPv6 allocation error."""
+
+
+class _DuplicateAddressError(HostAliasError):
+    """An OS-confirmed DAD conflict, not a timeout or a failed command."""
 
 
 @dataclass(frozen=True)
@@ -182,7 +190,7 @@ class LinuxAddressBackend(_CommandAddressBackend):
             lowered = output.lower()
             if "dadfailed" in lowered:
                 self.remove_address(interface, address)
-                raise HostAliasError("IPv6 duplicate address detection failed")
+                raise _DuplicateAddressError("IPv6 duplicate address detection failed")
             if str(address) in output and "tentative" not in lowered:
                 return
             time.sleep(0.05)
@@ -204,7 +212,7 @@ class LinuxAddressBackend(_CommandAddressBackend):
 
 
 class WindowsAddressBackend(_CommandAddressBackend):
-    """Windows backend using fixed netsh verbs without a command shell."""
+    """Fixed netsh writes and exact, locale-independent IP Helper state reads."""
 
     def interface_index(self, interface: str) -> int:
         interface = _safe_interface(interface)
@@ -242,50 +250,101 @@ class WindowsAddressBackend(_CommandAddressBackend):
 
     def add_address(self, interface: str, address: ipaddress.IPv6Address) -> None:
         interface = _safe_interface(interface)
+        interface_index = self.interface_index(interface)
         self._run([
             "netsh", "interface", "ipv6", "add", "address",
-            f"interface={interface}", f"address={address}/128",
+            f"interface={interface_index}", f"address={address}/128",
             "type=unicast", "store=active",
         ])
+        try:
+            self._wait_until_ready(interface, interface_index, address)
+        except (HostAliasError, OSError) as exc:
+            try:
+                # The add succeeded. Delete only our exact /128, even if the
+                # readiness query itself failed; do not depend on another read.
+                self._delete_address(str(interface_index), address)
+            except (HostAliasError, OSError) as cleanup_error:
+                raise HostAliasError(
+                    f"{exc}; IPv6 address rollback failed: {cleanup_error}"
+                ) from exc
+            raise
+
+    def _address_state(self, interface_index: int, address: ipaddress.IPv6Address) -> Optional[str]:
+        from ._windows_iphelper import address_state
+
+        try:
+            return address_state(interface_index, address)
+        except OSError as exc:
+            raise HostAliasError(
+                f"IPV6_STATE_QUERY_FAILED: cannot inspect {address} on "
+                f"interface index {interface_index}: {exc}"
+            ) from exc
+
+    def _wait_until_ready(
+        self, interface: str, interface_index: int, address: ipaddress.IPv6Address,
+    ) -> None:
         deadline = time.monotonic() + self.timeout
+        state = None
+        last_bind_error = None
+        target = f"{address} on {interface} (index {interface_index})"
         while time.monotonic() < deadline:
-            output = self._run([
-                "netsh", "interface", "ipv6", "show", "address",
-                f"interface={interface}",
-            ])
-            lowered = output.lower()
-            if "duplicate" in lowered or "重复" in output:
-                self.remove_address(interface, address)
-                raise HostAliasError("IPv6 duplicate address detection failed")
-            if str(address).lower() in lowered:
-                probe = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+            state = self._address_state(interface_index, address)
+            if state == "Duplicate":
+                raise _DuplicateAddressError(
+                    f"IPV6_DAD_DUPLICATE: duplicate address detected for {target}"
+                )
+            if state not in (None, "Tentative", "Preferred"):
+                raise HostAliasError(
+                    f"IPV6_ADDRESS_UNUSABLE: {target}; DAD state={state}"
+                )
+            if state == "Preferred":
+                probe = None
                 try:
+                    probe = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
                     probe.bind((str(address), 0))
-                except OSError:
-                    pass
+                except OSError as exc:
+                    code = getattr(exc, "winerror", None) or exc.errno
+                    if code != 10049:  # WSAEADDRNOTAVAIL: propagation may lag DAD.
+                        raise HostAliasError(
+                            f"IPV6_BIND_FAILED: {target}; DAD state=Preferred; "
+                            f"WinError {code}: {exc}"
+                        ) from exc
+                    last_bind_error = exc
                 else:
                     return
                 finally:
-                    probe.close()
-            time.sleep(0.05)
-        self.remove_address(interface, address)
-        raise HostAliasError("IPv6 duplicate address detection timed out")
+                    if probe is not None:
+                        probe.close()
+            remaining = deadline - time.monotonic()
+            if remaining > 0:
+                time.sleep(min(0.05, remaining))
+        if state == "Tentative":
+            reason = "IPV6_DAD_TIMEOUT: duplicate address detection is still tentative"
+        elif state == "Preferred":
+            reason = "IPV6_BIND_TIMEOUT: DAD completed but the address is not bindable"
+        else:
+            reason = "IPV6_ADDRESS_NOT_READY: added address was not found on the interface"
+        detail = f"; last bind error: {last_bind_error}" if last_bind_error else ""
+        raise HostAliasError(
+            f"{reason}; {target}; state={state or 'Missing'}; "
+            f"waited {self.timeout:g}s{detail}"
+        ) from last_bind_error
 
     def remove_address(self, interface: str, address: ipaddress.IPv6Address) -> None:
         interface = _safe_interface(interface)
-        if self.has_address(interface, address):
-            self._run([
-                "netsh", "interface", "ipv6", "delete", "address",
-                f"interface={interface}", f"address={address}", "store=active",
-            ])
+        interface_index = self.interface_index(interface)
+        if self._address_state(interface_index, address) is not None:
+            self._delete_address(str(interface_index), address)
+
+    def _delete_address(self, interface: str, address: ipaddress.IPv6Address) -> None:
+        self._run([
+            "netsh", "interface", "ipv6", "delete", "address",
+            f"interface={interface}", f"address={address}", "store=active",
+        ])
 
     def has_address(self, interface: str, address: ipaddress.IPv6Address) -> bool:
         interface = _safe_interface(interface)
-        output = self._run([
-            "netsh", "interface", "ipv6", "show", "address",
-            f"interface={interface}",
-        ])
-        return str(address).lower() in output.lower()
+        return self._address_state(self.interface_index(interface), address) is not None
 
 
 def system_address_backend() -> AddressBackend:
@@ -347,6 +406,9 @@ class HostAliasAllocator:
         self.reservation_seconds = reservation_seconds
         self._now = now
         self._records: Dict[str, _LeaseRecord] = {}
+        # Memory-only, bounded negative cache. Never adopt or remove an address
+        # already present on the interface, including another Agent's lease.
+        self._dad_conflicts: Dict[str, float] = {}
         self._lock = threading.RLock()
 
     @staticmethod
@@ -480,13 +542,49 @@ class HostAliasAllocator:
             ):
                 raise HostAliasError("configured global /64 is not on-link")
             used = {record.info.address for record in self._records.values()}
+            now = float(self._now())
+            self._dad_conflicts = {
+                address: until for address, until in self._dad_conflicts.items()
+                if until > now
+            }
+            recovery_deadline = time.monotonic() + _DAD_RETRY_WINDOW_SECONDS
+            conflicts = 0
             for counter in range(64):
                 address = self._address(owner, tenant, agent_id, counter)
-                if address is None or str(address) in used:
+                if (
+                    address is None or str(address) in used
+                    or str(address) in self._dad_conflicts
+                ):
                     continue
                 if self.backend.has_address(self.interface, address):
                     continue
-                self.backend.add_address(self.interface, address)
+                try:
+                    self.backend.add_address(self.interface, address)
+                except _DuplicateAddressError as exc:
+                    # Backends roll back their own failed add. Verify it before
+                    # trying another candidate; cleanup failure is NOT retryable.
+                    if self.backend.has_address(self.interface, address):
+                        raise HostAliasError(
+                            f"IPV6_DAD_CLEANUP_FAILED: conflicted address {address} "
+                            "is still present; automatic reallocation stopped"
+                        ) from exc
+                    if len(self._dad_conflicts) >= _DAD_QUARANTINE_LIMIT:
+                        self._dad_conflicts.pop(next(iter(self._dad_conflicts)))
+                    self._dad_conflicts[str(address)] = (
+                        float(self._now()) + _DAD_QUARANTINE_SECONDS
+                    )
+                    conflicts += 1
+                    if (
+                        conflicts >= _DAD_MAX_ATTEMPTS
+                        or time.monotonic() >= recovery_deadline
+                    ):
+                        raise HostAliasError(
+                            "IPV6_DAD_RETRY_EXHAUSTED: automatic address recovery "
+                            f"stopped after {conflicts} DAD conflict(s); "
+                            "check the gateway's NDP/proxy policy and on-link prefix. "
+                            "DAD remains enabled; failed addresses were removed"
+                        ) from exc
+                    continue
                 now = float(self._now())
                 info = HostAliasLeaseInfo(
                     lease_id=secrets.token_hex(32),
@@ -656,7 +754,7 @@ class AddressdTransport(Protocol):
 
 
 class UnixAddressdTransport:
-    def __init__(self, socket_path: Optional[str] = None, *, timeout: float = 5.0) -> None:
+    def __init__(self, socket_path: Optional[str] = None, *, timeout: Optional[float] = None) -> None:
         if not hasattr(socket, "AF_UNIX"):
             raise HostAliasError("this Python runtime does not support local Unix sockets")
         self.socket_path = socket_path or os.environ.get(
@@ -664,7 +762,10 @@ class UnixAddressdTransport:
             r"C:\ProgramData\Nexus\agent-addressd.sock"
             if os.name == "nt" else "/run/nexus-agent/addressd.sock",
         )
-        self.timeout = timeout
+        self.timeout = 5.0 if timeout is None else timeout
+        # Allocate may include bounded DAD recovery; connection/lease operations
+        # stay fast. An explicitly supplied timeout continues to override both.
+        self._allocation_timeout = 30.0 if timeout is None else timeout
 
     def call(self, method: str, parameters: Mapping[str, Any]) -> Mapping[str, Any]:
         request = json.dumps(
@@ -678,6 +779,8 @@ class UnixAddressdTransport:
             connection.settimeout(self.timeout)
             connection.connect(self.socket_path)
             with connection:
+                if method == "allocate":
+                    connection.settimeout(self._allocation_timeout)
                 connection.sendall(request)
                 response = bytearray()
                 while len(response) <= 65536:

@@ -31,6 +31,9 @@ from nexus_agent.addressd import (  # noqa: E402
     AddressdUnixServer,
 )
 from nexus_agent.windows_pipe import AddressdNamedPipeServer  # noqa: E402
+from nexus_agent.host_alias import (  # noqa: E402
+    LinuxAddressBackend, _DuplicateAddressError, _DAD_QUARANTINE_LIMIT,
+)
 
 
 PREFIX = "2606:4700:4700:1200::/64"
@@ -91,6 +94,91 @@ class HostAliasAllocatorTest(unittest.TestCase):
         self.assertEqual(renewed.expires_at, 1400.0)
         self.allocator.release(reserved.lease_id, owner="uid:1000")
         self.assertEqual(self.backend.addresses, set())
+
+    def test_duplicate_recovery_quarantines_only_conflicting_address(self):
+        other = self.allocate("other-agent")
+        first = self.allocator._address("uid:1000", "demo", "agent-a", 0)
+        second = self.allocator._address("uid:1000", "demo", "agent-a", 1)
+        original_add = self.backend.add_address
+
+        def add(interface, address):
+            if address == first:
+                raise _DuplicateAddressError("OS confirmed duplicate")
+            original_add(interface, address)
+
+        with mock.patch.object(self.backend, "add_address", side_effect=add) as added:
+            lease = self.allocate()
+            self.assertEqual(lease.address, str(second))
+            self.assertEqual(added.call_count, 2)
+            self.allocator.release(lease.lease_id, owner="uid:1000")
+            replacement = self.allocate()
+            self.assertEqual(replacement.address, lease.address)
+            self.assertEqual(added.call_count, 3)  # quarantined first address not retried
+            self.assertIn(("eth0", other.address), self.backend.addresses)
+            self.assertNotIn(("eth0", str(first)), self.backend.addresses)
+            self.assertEqual(len(self.allocator.list()), 2)
+            self.allocator.release(replacement.lease_id, owner="uid:1000")
+        self.clock.value += 301
+        self.assertEqual(self.allocate().address, str(first))  # quarantine expires
+
+    def test_continuous_duplicates_stop_after_three_and_leave_no_lease(self):
+        with mock.patch.object(self.backend, "add_address", side_effect=_DuplicateAddressError("duplicate")) as added:
+            with self.assertRaisesRegex(HostAliasError, "IPV6_DAD_RETRY_EXHAUSTED.*3 DAD"):
+                self.allocate()
+            self.assertEqual(added.call_count, 3)
+        self.assertEqual(self.allocator.list(), ())
+        self.assertEqual(self.backend.addresses, set())
+        self.assertEqual(len(self.allocator._dad_conflicts), 3)
+
+    def test_recovery_time_budget_prevents_further_attempts(self):
+        with mock.patch("nexus_agent.host_alias.time.monotonic", side_effect=[0.0, 10.1]), mock.patch.object(
+            self.backend, "add_address", side_effect=_DuplicateAddressError("duplicate")
+        ) as added:
+            with self.assertRaisesRegex(HostAliasError, "IPV6_DAD_RETRY_EXHAUSTED.*1 DAD"):
+                self.allocate()
+            added.assert_called_once()
+
+    def test_quarantine_is_bounded_and_expired_entries_are_removed(self):
+        for index in range(_DAD_QUARANTINE_LIMIT):
+            self.allocator._dad_conflicts[str(ipaddress.IPv6Address(int(ipaddress.IPv6Network(PREFIX).network_address) + index))] = self.clock() + 10
+        with mock.patch.object(self.backend, "add_address", side_effect=_DuplicateAddressError("duplicate")):
+            with self.assertRaisesRegex(HostAliasError, "IPV6_DAD_RETRY_EXHAUSTED"):
+                self.allocate()
+        self.assertEqual(len(self.allocator._dad_conflicts), _DAD_QUARANTINE_LIMIT)
+        self.clock.value += 301
+        self.allocate()
+        self.assertEqual(self.allocator._dad_conflicts, {})
+
+    def test_failed_cleanup_stops_without_deleting_or_leasing_another_address(self):
+        def add(interface, address):
+            self.backend.addresses.add((interface, str(address)))
+            raise _DuplicateAddressError("duplicate with failed removal")
+        with mock.patch.object(self.backend, "add_address", side_effect=add) as added, mock.patch.object(
+            self.backend, "remove_address"
+        ) as removed:
+            with self.assertRaisesRegex(HostAliasError, "IPV6_DAD_CLEANUP_FAILED"):
+                self.allocate()
+            added.assert_called_once()
+            removed.assert_not_called()
+        self.assertEqual(self.allocator.list(), ())
+
+    def test_non_dad_errors_are_never_retried_or_quarantined(self):
+        for reason in ("permission denied", "IPV6_DAD_TIMEOUT", "IPV6_BIND_FAILED", "IPV6_DAD_DUPLICATE: rollback failed"):
+            with self.subTest(reason=reason), mock.patch.object(
+                self.backend, "add_address", side_effect=HostAliasError(reason)
+            ) as added:
+                with self.assertRaisesRegex(HostAliasError, reason):
+                    self.allocate()
+                added.assert_called_once()
+                self.assertEqual(self.allocator._dad_conflicts, {})
+
+    def test_existing_local_address_is_never_deleted_or_adopted(self):
+        first = self.allocator._address("uid:1000", "demo", "agent-a", 0)
+        self.backend.add_address("eth0", first)
+        lease = self.allocate()
+        self.assertNotEqual(lease.address, str(first))
+        self.allocator.release(lease.lease_id, owner="uid:1000")
+        self.assertEqual(self.backend.addresses, {("eth0", str(first))})
 
     def test_renew_refreshes_backend_address_when_supported(self):
         backend = mock.Mock(wraps=self.backend)
@@ -183,6 +271,33 @@ class HostAliasAllocatorTest(unittest.TestCase):
         )
         self.assertEqual(restarted.restore(snapshot), 0)
         self.assertNotIn(("eth0", reserved.address), self.backend.addresses)
+
+
+class DadBackendAndTransportTest(unittest.TestCase):
+    def test_linux_dad_signal_is_typed_only_after_successful_cleanup(self):
+        backend = LinuxAddressBackend()
+        address = ipaddress.IPv6Address("2606:4700:4700:1200::1234")
+        with mock.patch.object(backend, "_run", side_effect=["", f"inet6 {address} dadfailed"]), mock.patch.object(
+            backend, "remove_address"
+        ) as removed:
+            with self.assertRaises(_DuplicateAddressError):
+                backend.add_address("eth0", address)
+            removed.assert_called_once_with("eth0", address)
+        with mock.patch.object(backend, "_run", side_effect=["", f"inet6 {address} dadfailed"]), mock.patch.object(
+            backend, "remove_address", side_effect=HostAliasError("cleanup denied")
+        ):
+            with self.assertRaises(HostAliasError) as raised:
+                backend.add_address("eth0", address)
+            self.assertNotIsInstance(raised.exception, _DuplicateAddressError)
+
+    @unittest.skipUnless(hasattr(socket, "AF_UNIX"), "Unix sockets required")
+    def test_allocate_has_recovery_timeout_without_slowing_status_or_overriding_explicit_timeout(self):
+        for method, timeout, expected in (("allocate", None, [5.0, 30.0]), ("status", None, [5.0]), ("allocate", 2.0, [2.0, 2.0])):
+            with self.subTest(method=method, timeout=timeout), mock.patch("socket.socket") as factory:
+                connection = factory.return_value
+                connection.recv.return_value = b'{"version":1,"ok":true,"result":{}}\n'
+                UnixAddressdTransport("/test.sock", timeout=timeout).call(method, {})
+                self.assertEqual(connection.settimeout.call_args_list, [mock.call(value) for value in expected])
 
 
 class AddressdProtocolTest(unittest.TestCase):
@@ -484,8 +599,10 @@ class WindowsAddressdTest(unittest.TestCase):
         with mock.patch.object(
             backend,
             "_run",
-            side_effect=["", f"Address {address} Parameters\nDAD State: Preferred"],
-        ) as run, mock.patch("socket.socket", return_value=probe):
+            return_value="",
+        ) as run, mock.patch.object(backend, "interface_index", return_value=27), mock.patch.object(
+            backend, "_address_state", return_value="Preferred",
+        ), mock.patch("socket.socket", return_value=probe):
             backend.add_address("Ethernet", address)
         self.assertIn(f"address={address}/128", run.call_args_list[0].args[0])
         probe.bind.assert_called_once_with((str(address), 0))

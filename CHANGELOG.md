@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.49.1 — 2026-10-06
+
+- Recover automatically from OS-confirmed IPv6 address conflicts on Windows and
+  Linux. Clean up the failed address, try at most three candidates, and temporarily
+  avoid known conflicts without disabling DAD or touching other addresses.
+- Query the exact Windows address through IP Helper instead of localized command
+  output. Distinguish DAD conflicts, timeouts, binding errors and cleanup failures.
+- Add `nexus-agent doctor`, `repair --yes` and `run --repair` for explicit,
+  bounded MCP dependency recovery before execution. Never replay a failed Agent.
+- Avoid the incompatible Python 3.10 / griffelib 2.3.1 dependency combination.
+- Existing Windows address services need their private SDK runtime updated after
+  pip upgrade; restarting an old service alone does not copy the fix. See the
+  [Windows service upgrade guide](README_GUIDE.md#configure-agent-ipv6-on-windows).
+
 ## 0.49.0 — 2026-10-04
 
 - Add native Streamable HTTP MCP on public IPv6, with bounded requests,

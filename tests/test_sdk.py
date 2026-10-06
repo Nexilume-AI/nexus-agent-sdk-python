@@ -2,6 +2,7 @@ import json
 import pathlib
 import socket
 import sys
+import ssl
 import threading
 import time
 import unittest
@@ -437,6 +438,7 @@ class SdkTest(unittest.TestCase):
     def test_tls_connection_uses_separate_server_identity(self):
         class RecordingContext:
             check_hostname = True
+            verify_mode = ssl.CERT_REQUIRED
 
             def __init__(self):
                 self.server_hostname = None
