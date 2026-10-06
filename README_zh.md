@@ -16,21 +16,25 @@
 
 [English](README.md) · **简体中文**
 
-[功能](#可以做什么) · [快速开始](#快速开始) · [项目生态](#项目生态) · [参与贡献](#参与贡献) · [引用](#引用)
+[动机](#动机) · [功能](#可以做什么) · [快速开始](#快速开始) · [项目生态](#项目生态) · [参与贡献](#参与贡献) · [引用](#引用)
 
 </div>
 
 > **[在线体验 Nexus Cloud](https://cloud.nexilume.com/)**：在浏览器中探索 Nexus Cloud，也可以自行部署，开始使用。
 
-0.48.0 已补齐依赖声明：Computer Tool Setup 在
-Python 3.9/3.10 使用 `tomli`，MCP/A2A 显式声明直接依赖，`fastmcp-tasks`
-安装入口改用官方 `fastmcp[tasks]`。旧版发布文件保持不变。
-核心与 Computer 支持 Python 3.9+，Browser/FastMCP/A2A 需要 3.10+，推荐 3.12。
-Browser 二进制和系统库、Docker 及 Provider 镜像不由 pip 自动安装；
-`windows` extra 用于 Windows 地址/服务辅助功能，普通 Computer 配对不需要它。
-详见[依赖兼容说明](README_GUIDE.md#dependency-compatibility)。
+用 Python 写 Agent，让别人能够使用它、跟随进度，并与它一起完成任务。
 
-用 Python 构建 Agent、提供 MCP 工具、向 OpenWrt 注册，以及将已授权的 Computer Runtime 连接到 Cloud。
+## 动机
+
+你用 Python 写了一个读取文件、生成报告的 Agent。第一份有用的结果已经在自己的电脑上跑出来了，你想把它交给同事试试。理想中，对方不必学会怎样运行你的代码，只要交给它一个任务，就能获得同样的帮助。
+
+当别人真正用起来，体验就不只是最后那份报告了。等待时，他想知道任务进行到了哪里；过程中，他可能需要补充一个要求；完成后，他希望能直接找到文件。于是，你开始围绕已经写好的 Agent，补调用入口、进度界面、对话流程和文件交付。
+
+**Nexus Agent SDK 帮你把这段 Python 代码带到用户面前，让别人用得上、看得到过程，也能参与其中。**
+
+接入 [Nexus Cloud](https://github.com/Nexilume-AI/nexus-cloud) 后，你的代码可以在同一个任务页面里展示计划、发送进度、向用户提问，并交付生成的文件。这些交互都有现成的 SDK 接口，可以随着任务需要逐步加入。如果工作涉及用户自己的电脑或手机，还可以使用他已连接并授权的设备，例如打开电脑上的浏览器，或处理其中的文件。
+
+你可以将 Python 能力作为托管 MCP 工具提供服务，也可以通过 [Nexus OpenWrt](https://github.com/Nexilume-AI/nexus-openwrt) 注册到边缘网络。模型和推理框架仍由你选择，服务接入与用户交互则复用 SDK 的接口。这样，你能把更多时间花在让 Agent 真正有用上，而不是为每个 Agent 重写一遍“怎样让别人用起来”。
 
 ![Nexus Agent SDK for Python 流程示意图](docs/media/overview.svg)
 
@@ -63,6 +67,14 @@ Browser 二进制和系统库、Docker 及 Provider 镜像不由 pip 自动安�
 ## 快速开始
 
 推荐 Python 3.12；核心运行支持 3.9+，源码构建要求 3.10+，可选依赖可能要求更高版本。
+
+0.48.0 已补齐依赖声明：Computer Tool Setup 在
+Python 3.9/3.10 使用 `tomli`，MCP/A2A 显式声明直接依赖，`fastmcp-tasks`
+安装入口改用官方 `fastmcp[tasks]`。旧版发布文件保持不变。
+核心与 Computer 支持 Python 3.9+，Browser/FastMCP/A2A 需要 3.10+，推荐 3.12。
+Browser 二进制和系统库、Docker 及 Provider 镜像不由 pip 自动安装；
+`windows` extra 用于 Windows 地址/服务辅助功能，普通 Computer 配对不需要它。
+详见[依赖兼容说明](README_GUIDE.md#dependency-compatibility)。
 
 ```sh
 python -m venv .venv

@@ -16,13 +16,43 @@
 
 **English** · [Chinese](README_zh.md)
 
-[Highlights](#highlights) · [Quick start](#quick-start) · [Documentation](#documentation) · [Ecosystem](#ecosystem) · [Contributing](#contributing) · [Citation](#citation)
+[Motivation](#motivation) · [Highlights](#highlights) · [Quick start](#quick-start) · [Documentation](#documentation) · [Ecosystem](#ecosystem) · [Contributing](#contributing) · [Citation](#citation)
 
 </div>
 
 > **[Try Nexus Cloud online](https://cloud.nexilume.com/)**: Explore Nexus Cloud in your browser, or self-host to get started.
 
-Build callable Agents, expose MCP tools, register through OpenWrt, and connect an authorized Computer Runtime to Nexus Cloud.
+Build Python Agents that people can use, follow and work with.
+
+## Motivation
+
+You have written a Python Agent that reads files and produces a report. The
+first useful result appears on your computer, and you want to share it with a
+colleague. Ideally, they could give it a task and get the same help without
+learning how to run your code.
+
+Once they start using it, the experience matters as much as the result. They want
+to know what is happening while they wait, clarify a requirement halfway through
+and find the finished report. As the developer, you find yourself building a way
+to start tasks, a progress view, a conversation flow and file delivery around the
+Agent you already wrote.
+
+**Nexus Agent SDK helps you bring that Python Agent to other people, with a way
+to use it, follow its work and contribute along the way.**
+
+Connected to [Nexus Cloud](https://github.com/Nexilume-AI/nexus-cloud), your code
+can show a plan, send a progress message, ask the user a question and return a
+file in the same run page. The SDK supplies the interfaces for these interactions,
+so you can add them as the task needs them. When the work involves the user's own
+computer or phone, you can also use the devices they have connected and authorized,
+such as opening a browser or working with files on their computer.
+
+You can serve your Python capabilities as hosted MCP tools or register them
+through [Nexus OpenWrt](https://github.com/Nexilume-AI/nexus-openwrt) for edge
+routing. You keep the model and reasoning framework you prefer, while reusing
+the SDK's serving and interaction interfaces. The goal is to spend more time
+making the Agent useful, and less time rebuilding the connections that let
+someone else use it.
 
 ![Nexus Agent SDK for Python: illustrated workflow](docs/media/overview.svg)
 
