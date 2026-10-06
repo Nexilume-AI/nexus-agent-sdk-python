@@ -101,7 +101,8 @@ class RuntimeHealthTest(unittest.TestCase):
                  mock.patch.object(health.subprocess, "call", return_value=7) as call:
                 self.assertEqual(health.main(["run", "--repair", str(script), "--demo"]), 7)
             repair.assert_called_once_with(confirmed=True)
-            call.assert_called_once_with([sys.executable, str(script), "--demo"])
+            # Windows CI may expose TEMP through an 8.3 alias; the CLI resolves it.
+            call.assert_called_once_with([sys.executable, str(script.resolve()), "--demo"])
 
     def test_run_does_not_execute_when_environment_still_broken(self):
         with tempfile.TemporaryDirectory() as folder:
