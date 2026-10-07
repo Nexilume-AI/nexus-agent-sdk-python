@@ -60,7 +60,7 @@ someone else use it.
 
 ## From Python to a private Run
 
-**Enterprise UI, October 1, 2026.** This real Docker-hosted SDK example uses
+This real Docker-hosted SDK example uses
 `NexusMCPServer`, `plan`, `chat.ask()` and private file upload. It is deterministic,
 uses no paid model and does not access a personal device.
 
