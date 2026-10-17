@@ -13,8 +13,8 @@ Use a virtual environment. The dependency-free core supports Python 3.9+;
 Python 3.12 is recommended for optional integrations.
 
 ```sh
-python -m pip install nexilume==0.49.1
-python -m pip install "nexilume[fastmcp]==0.49.1"
+python -m pip install nexilume==0.50.0
+python -m pip install "nexilume[fastmcp]==0.50.0"
 ```
 
 Use `python -m pip install --upgrade nexilume` to upgrade the core SDK.
@@ -49,7 +49,7 @@ Nexus installation. OpenWrt LAN registration is a separate supported mode.
 ## Computer Runtime
 
 ```sh
-python -m pip install "nexilume[computer,browser]==0.49.1"
+python -m pip install "nexilume[computer,browser]==0.50.0"
 nexus-computer setup "<pairing-url-from-your-cloud>"
 nexus-computer status
 ```
@@ -59,7 +59,7 @@ the Computer in Cloud. No inbound SSH port is needed. Browser control requires
 a compatible local Chromium browser and the `browser` extra. Never share
 pairing links, device keys or tokens.
 
-## IPv6 and MCP recovery in 0.49.1
+## IPv6 and MCP recovery (introduced in 0.49.1)
 
 OS-confirmed IPv6 conflicts now trigger bounded automatic reallocation: the
 failed address is removed, another candidate is tried, and known conflicts are
