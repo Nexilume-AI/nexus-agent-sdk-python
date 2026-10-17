@@ -74,6 +74,8 @@ class OpenRoadRegistrationTests(unittest.TestCase):
     def test_cloud_export_checks_hash_and_uses_run_private_reference(self):
         import hashlib
         with tempfile.TemporaryDirectory() as folder:
+            # macOS /var is an OS alias; the fixture must use a canonical trusted root.
+            folder=str(pathlib.Path(folder).resolve())
             jid,aid='a'*32,'b'*24
             root=pathlib.Path(folder)/'jobs'/jid;root.mkdir(parents=True)
             (root/'state.json').write_text(json.dumps({'artifacts_ready':True}))
