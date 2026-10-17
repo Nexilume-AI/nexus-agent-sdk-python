@@ -128,7 +128,7 @@ class RealFastMCPTest(unittest.TestCase):
                     "method": "tools/call",
                     "params": {"name": "add", "arguments": {"a": 7, "b": 8}},
                 },
-            }), {"total": 15})
+            })["result"]["structuredContent"], {"total": 15})
             stream_events, first_delay, total_delay = post_stream({
                 "protocol": "mcp",
                 "selector": "add",
@@ -144,7 +144,10 @@ class RealFastMCPTest(unittest.TestCase):
                 ["progress", "progress", "result"],
             )
             self.assertEqual(stream_events[0]["data"]["message"], "validated")
-            self.assertEqual(stream_events[-1]["data"], {"result": {"total": 42}})
+            native = stream_events[-1]["data"]["result"]
+            self.assertEqual(native["nexus_mcp_result_version"], 1)
+            self.assertEqual(native["result"]["structuredContent"], {"total": 42})
+            self.assertFalse(native["result"]["isError"])
             self.assertLess(first_delay, total_delay - 0.15)
         finally:
             server.shutdown()
