@@ -13,7 +13,8 @@ eda=importlib.util.module_from_spec(spec);spec.loader.exec_module(eda)
 class WorkflowTests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
-        self.root=Path(self.tmp.name)
+        # Match the service's canonical root (Windows short names and macOS /var aliases).
+        self.root=Path(self.tmp.name).resolve()
         self.flow=self.root/'flow'
         (self.flow/'platforms/nangate45').mkdir(parents=True)
         (self.flow/'platforms/nangate45/config.mk').touch()
