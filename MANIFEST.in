@@ -6,3 +6,7 @@ recursive-include deploy *.example *.service *.sysusers *.ps1
 recursive-include tests *.py
 recursive-include scripts *.py
 global-exclude *.pyc
+
+include examples/openroad_mcp_agent/compose.yaml
+include tests/fixtures/openroad_mcp_tools_1_1_0.json
+include docs/agent-training-data.md

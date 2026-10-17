@@ -5,6 +5,7 @@ from .files import NexusFileError
 from .inbox import NexusFollowUpUnavailable, RunInput
 
 from .agent import NexusAgent, NexusAgentHandle, PublishedCapability
+from .mcp_results import McpToolResult
 from .auth import (
     AutoTokenProvider,
     EnvironmentTokenProvider,
@@ -176,6 +177,7 @@ __all__ = [
     "MemoryDeleteResult",
     "MOBILE_SCOPES",
     "McpToolDescriptor",
+    "McpToolResult",
     "NexusExecutionProfile",
     "NexusAgent",
     "NexusAgentClient",

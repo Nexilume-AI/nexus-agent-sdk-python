@@ -305,6 +305,21 @@ def fastmcp_result_to_json(result: Any) -> Any:
     return None
 
 
+def fastmcp_result_to_mcp(result: Any) -> Any:
+    """Keep native blocks and isError when the incoming protocol is MCP."""
+    from .mcp_results import McpToolResult
+    content = _json_value(_attribute(result, "content") or [])
+    structured = _attribute(result, "structured_content", "structuredContent")
+    data = _attribute(result, "data")
+    if structured is None and isinstance(data, Mapping):
+        structured = data
+    if not content and data is not None:
+        content = [{"type": "text", "text": json.dumps(_json_value(data), ensure_ascii=False)}]
+    return McpToolResult(content=content,
+        structured_content=_json_value(structured) if structured is not None else None,
+        is_error=bool(_attribute(result, "is_error", "isError")))
+
+
 class _AsyncLoop:
     def __init__(self) -> None:
         self.loop: Optional[asyncio.AbstractEventLoop] = None
@@ -636,7 +651,7 @@ class FastMCPBridge:
             finally:
                 self._runner.stop()
 
-    async def _call_tool(self, tool: str, arguments: Mapping[str, Any], meta: Any) -> Any:
+    async def _call_tool(self, tool: str, arguments: Mapping[str, Any], meta: Any, native_result: bool = False) -> Any:
         client = self._client
         if client is None:
             raise FastMCPBridgeError("FastMCP bridge is not running")
@@ -646,7 +661,7 @@ class FastMCPBridge:
         if meta:
             keywords["meta"] = meta
         result = await client.call_tool(tool, dict(arguments), **keywords)
-        return fastmcp_result_to_json(result)
+        return fastmcp_result_to_mcp(result) if native_result else fastmcp_result_to_json(result)
 
     async def _call_tool_with_progress(
         self,
@@ -654,6 +669,7 @@ class FastMCPBridge:
         arguments: Mapping[str, Any],
         meta: Any,
         events: "queue.Queue[Mapping[str, Any]]",
+        native_result: bool = False,
     ) -> Any:
         client = self._client
         if client is None:
@@ -706,19 +722,20 @@ class FastMCPBridge:
         if meta:
             keywords["meta"] = meta
         result = await client.call_tool(tool, dict(arguments), **keywords)
-        return fastmcp_result_to_json(result)
+        return fastmcp_result_to_mcp(result) if native_result else fastmcp_result_to_json(result)
 
     def _submit_call(
         self,
         tool: str,
         arguments: Mapping[str, Any],
         meta: Optional[Mapping[str, Any]],
+        native_result: bool = False,
     ) -> Future:
         if tool not in self._mapping_by_tool:
             raise FastMCPBridgeError(f"FastMCP tool is not mapped to Nexus: {tool}")
         with self._lock:
             self.start()
-            return self._runner.submit(self._call_tool(tool, arguments, meta))
+            return self._runner.submit(self._call_tool(tool, arguments, meta, native_result))
 
     def call_tool_sync(
         self,
@@ -726,10 +743,11 @@ class FastMCPBridge:
         arguments: Mapping[str, Any],
         *,
         meta: Optional[Mapping[str, Any]] = None,
+        native_result: bool = False,
     ) -> Any:
         """Call a mapped FastMCP tool from synchronous application code."""
 
-        future = self._submit_call(tool, arguments, meta)
+        future = self._submit_call(tool, arguments, meta, native_result)
         wait_timeout = None if self.call_timeout is None else self.call_timeout + 1.0
         try:
             return future.result(timeout=wait_timeout)
@@ -755,6 +773,7 @@ class FastMCPBridge:
         arguments: Mapping[str, Any],
         *,
         meta: Optional[Mapping[str, Any]] = None,
+        native_result: bool = False,
     ) -> Iterator[SseEvent]:
         """Yield bounded MCP progress notifications and one terminal event."""
 
@@ -766,7 +785,7 @@ class FastMCPBridge:
                 maxsize=self.max_stream_events
             )
             future = self._runner.submit(
-                self._call_tool_with_progress(tool, arguments, meta, events)
+                self._call_tool_with_progress(tool, arguments, meta, events, native_result)
             )
         sequence = 0
         try:
@@ -801,6 +820,8 @@ class FastMCPBridge:
                             event_id=str(sequence),
                         )
                     else:
+                        if native_result:
+                            result = result.to_wire()
                         sequence += 1
                         yield SseEvent(
                             data=json.dumps(
@@ -872,7 +893,8 @@ class FastMCPBridge:
         arguments = self._arguments(envelope, mapping.tool)
         meta = self._metadata(envelope)
         try:
-            return self.call_tool_sync(mapping.tool, arguments, meta=meta)
+            return self.call_tool_sync(mapping.tool, arguments, meta=meta,
+                                       native_result=str(envelope.protocol or "").lower() == "mcp")
         except FastMCPToolError as exc:
             message = str(exc)[:512] or "FastMCP tool failed"
             status = 504 if "timed out" in message.lower() else 502
@@ -909,6 +931,7 @@ class FastMCPBridge:
             mapping.tool,
             arguments,
             meta=self._metadata(envelope),
+            native_result=str(envelope.protocol or "").lower() == "mcp",
         )
 
     @contextmanager

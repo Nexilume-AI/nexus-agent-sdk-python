@@ -1,0 +1,81 @@
+name: nexus-openroad-agent
+services:
+  mcp:
+    image: ghcr.io/the-openroad-project/openroad-mcp@sha256:8d7120ce36816e8bfc327989abb9e58f22225ad45787703fab07d0ca1ea91423
+    init: true
+    restart: unless-stopped
+    user: "${OPENROAD_UID:-1000}:${OPENROAD_GID:-1000}"
+    entrypoint: ["python3", "-u", "/app/mcp_socket.py"]
+    working_dir: /work
+    read_only: true
+    network_mode: none
+    environment:
+      HOME: /work
+      OPENROAD_RUN_LOG_DIR: /work/run-logs
+      ORFS_FLOW_PATH: /OpenROAD-flow-scripts/flow
+      OPENROAD_ALLOWED_COMMANDS: "openroad,yosys,yosys-abc,sta,klayout,sby,eqy,kepler-formal,naja_edit,yosys-smtbmc,yosys-witness,yosys-filterlib,yosys-config"
+      PATH: /OpenROAD-flow-scripts/tools/install/kepler-formal/bin:/OpenROAD-flow-scripts/tools/install/OpenROAD/bin:/OpenROAD-flow-scripts/tools/install/yosys/bin:/usr/local/bin/wrapped-cc:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      QT_QPA_PLATFORM: offscreen
+    volumes:
+      - ./mcp_socket.py:/app/mcp_socket.py:ro
+      - ./eda_workflows.py:/app/eda_workflows.py:ro
+      - ./work:/work:rw
+      - ./ipc:/ipc:rw
+      - ./work/orfs/logs:/OpenROAD-flow-scripts/flow/logs:rw
+      - ./work/orfs/reports:/OpenROAD-flow-scripts/flow/reports:rw
+      - ./work/orfs/results:/OpenROAD-flow-scripts/flow/results:rw
+      - ./work/orfs/objects:/OpenROAD-flow-scripts/flow/objects:rw
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=2g
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 256
+    mem_limit: 16g
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+  agent:
+    image: python:3.12-slim
+    init: true
+    restart: unless-stopped
+    user: "${OPENROAD_UID:-1000}:${OPENROAD_GID:-1000}"
+    entrypoint: ["python3", "-u", "/app/openroad_bridge.py"]
+    working_dir: /app
+    read_only: true
+    environment:
+      PYTHONPATH: /sdk/src
+      NEXUS_ROUTER_URL: http://router:7446
+      OPENROAD_RESPONSE_BUDGET: "983040"
+      HOME: /tmp
+      NO_PROXY: "*"
+    volumes:
+      - ./agent.py:/app/openroad_bridge.py:ro
+      - ../../src:/sdk/src:ro
+      - ./ipc:/ipc:rw
+      - ./results:/work/nexus-results:rw
+      - ./work/eda:/work/eda:ro
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=64m
+    networks:
+      - nexus-agent-network
+    depends_on:
+      - mcp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 64
+    mem_limit: 256m
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+networks:
+  nexus-agent-network:
+    external: true
+    name: ${NEXUS_DOCKER_NETWORK:-nexus-agent-network}

@@ -60,6 +60,7 @@ from .reporting import (
     NexusRunContextExchangeError,
 )
 from .resume import StreamResumeError, StreamResumeStore
+from .mcp_results import McpToolResult
 from .server_auth import (
     NoServerAuth,
     ServerAuthenticationError,
@@ -225,6 +226,12 @@ def _safe_response_headers(headers: Mapping[str, str]) -> Dict[str, str]:
     return result
 
 
+def _mcp_json_default(value: Any) -> Any:
+    if isinstance(value, McpToolResult):
+        return value.to_wire()
+    raise TypeError("Agent response is not JSON serializable")
+
+
 def _sse_event(item: StreamItem) -> SseEvent:
     event: Optional[str] = None
     event_id: Optional[str] = None
@@ -239,7 +246,7 @@ def _sse_event(item: StreamItem) -> SseEvent:
     elif isinstance(item, str):
         data = item
     else:
-        data = json.dumps(item, separators=(",", ":"), ensure_ascii=False)
+        data = json.dumps(item, separators=(",", ":"), ensure_ascii=False, default=_mcp_json_default)
     for value in (event, event_id):
         if value is not None and ("\r" in value or "\n" in value):
             raise AgentRequestError(500, "INVALID_SSE_EVENT", "SSE metadata contains a newline")
@@ -1119,7 +1126,7 @@ class NexusAgentServer:
                 raw = _sse_bytes(SseEvent(
                     event=event_name,
                     event_id=str(sequence),
-                    data=json.dumps(data, separators=(",", ":"), ensure_ascii=False),
+                    data=json.dumps({"result": data} if event_name == "result" else data, separators=(",", ":"), ensure_ascii=False, default=_mcp_json_default),
                 ))
                 if len(raw) > self.max_stream_event_bytes:
                     raise AgentRequestError(
@@ -1148,7 +1155,7 @@ class NexusAgentServer:
         if status < 100 or status > 599:
             raise AgentRequestError(500, "INVALID_RESPONSE", "handler returned an invalid status")
         try:
-            raw = json.dumps(body, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+            raw = json.dumps(body, separators=(",", ":"), ensure_ascii=False, default=_mcp_json_default).encode("utf-8")
         except (TypeError, ValueError) as exc:
             raise AgentRequestError(500, "INVALID_RESPONSE", "handler response is not JSON serializable") from exc
         if len(raw) > self.max_response_bytes:

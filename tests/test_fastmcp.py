@@ -219,7 +219,7 @@ class FastMCPBridgeTest(unittest.TestCase):
             },
         }
         try:
-            self.assertEqual(bridge.handle(self.envelope(payload)), {"ok": True})
+            self.assertEqual(bridge.handle(self.envelope(payload)).to_dict()["structuredContent"], {"ok": True})
             self.assertEqual(
                 client.calls[0][1], {"source": "module top; endmodule"}
             )

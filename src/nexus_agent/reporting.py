@@ -2864,6 +2864,7 @@ class NexusRunContext:
                 "Content-Type": "application/json",
                 "Connection": "close",
                 "X-Nexus-Run-Context-Token": token,
+                "User-Agent": "nexus-agent-sdk-python/0.35.0",
             },
             method="POST",
         )
@@ -2908,6 +2909,8 @@ class NexusRunContext:
         return context
 
     def _open_cloud(self, request: Request, *, timeout: Optional[float] = None):
+        if not request.has_header("User-agent"):
+            request.add_header("User-Agent", "nexus-agent-sdk-python/0.35.0")
         request_timeout = self.config.request_timeout if timeout is None else float(timeout)
         if self._cloud_opener is not None:
             return self._cloud_opener(

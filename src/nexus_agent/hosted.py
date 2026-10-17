@@ -150,13 +150,15 @@ def create_mcp_server(agent: Any) -> Any:
                 # Let the existing SDK serializer preserve MCP content and handle
                 # dataclasses/bytes consistently with the edge bridge.
                 from .fastmcp import _json_value
+                from .mcp_results import McpToolResult
+                if isinstance(result, McpToolResult):
+                    result = result.to_dict()
                 result = _json_value(result)
                 if isinstance(result, dict) and isinstance(result.get("content"), list):
-                    if result.get("isError"):
-                        raise ToolError("Agent capability rejected the request")
                     from mcp.types import CallToolResult
                     content = CallToolResult.model_validate(result)
-                    return ToolResult(content=content.content, structured_content=content.structuredContent)
+                    return ToolResult(content=content.content, structured_content=content.structuredContent,
+                                      is_error=bool(content.isError))
                 return ToolResult(content=json.dumps(result, ensure_ascii=False) if not isinstance(result, str) else result,
                                   structured_content=result if isinstance(result, dict) else None)
             except Exception as exc:
