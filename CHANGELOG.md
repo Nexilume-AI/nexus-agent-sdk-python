@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.50.0 — 2026-10-17
+
+- Add a deployable OpenROAD MCP bridge with discovered tool schemas, Yosys/EDA
+  workflows, persistent asynchronous jobs, progress logs and verified artifacts.
+- Preserve native MCP content and error semantics through hosted/FastMCP and
+  edge SSE adapters using `McpToolResult`.
+- Add explicit client trajectory collection with `nexus_agent.training` for
+  private training Data Assets. No automatic client conversation upload occurs.
+
+See [OpenROAD MCP](examples/openroad_mcp_agent/README.md) and
+[Agent training](docs/agent-training-data.md). Includes the OpenROAD Compose example and training guide in the source distribution.
+
 ## 0.49.1 — 2026-10-06
 
 - Recover automatically from OS-confirmed IPv6 address conflicts on Windows and
@@ -110,17 +122,3 @@ Runtime fixes adapted from [Nexus Cloud Community PR #5](https://github.com/Nexi
 
 Earlier versions were developed in the Nexus workspace. This repository starts with a
 clean source snapshot and does not include that workspace's history or server code.
-
-
-## Unreleased — 2026-10-17 source update
-
-- Add a deployable OpenROAD MCP bridge with discovered tool schemas, Yosys/EDA
-  workflows, persistent asynchronous jobs, progress logs and verified artifacts.
-- Preserve native MCP content and error semantics through hosted/FastMCP and
-  edge SSE adapters using `McpToolResult`.
-- Add explicit client trajectory collection with `nexus_agent.training` for
-  private training Data Assets. No automatic client conversation upload occurs.
-
-See [OpenROAD MCP](examples/openroad_mcp_agent/README.md) and
-[Agent training](docs/agent-training-data.md). This is a repository source update;
-the existing PyPI version has not been republished.
