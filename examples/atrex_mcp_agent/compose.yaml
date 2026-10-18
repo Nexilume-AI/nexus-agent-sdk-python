@@ -1,0 +1,42 @@
+name: nexus-atrex-agent
+services:
+  agent:
+    image: python:3.12-slim
+    init: true
+    restart: unless-stopped
+    user: "${ATREX_UID:-1000}:${ATREX_GID:-1000}"
+    entrypoint: ["python3", "-u", "/app/agent.py"]
+    working_dir: /app
+    read_only: true
+    environment:
+      PYTHONPATH: /sdk/src
+      PYTHONDONTWRITEBYTECODE: "1"
+      NEXUS_ROUTER_URL: http://router:7446
+      HOME: /tmp
+      NO_PROXY: "*"
+    volumes:
+      - ./agent.py:/app/agent.py:ro
+      - ./service.py:/app/service.py:ro
+      - ../sdk/src:/sdk/src:ro
+      - ./upstream:/upstream:ro
+      - ./data:/data:rw
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=64m
+    networks:
+      - nexus-agent-network
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 64
+    mem_limit: 256m
+    cpus: "1.0"
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+networks:
+  nexus-agent-network:
+    external: true
+    name: ${NEXUS_AGENT_NETWORK:-nexus-agent-network}
