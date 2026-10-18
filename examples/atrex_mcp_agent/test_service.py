@@ -21,7 +21,7 @@ class Tests(unittest.TestCase):
     def test_metadata(self):
         from nexus_agent import McpToolDescriptor
         tools = catalog()
-        self.assertEqual(len({t['name'] for t in tools}),11)
+        self.assertEqual(len({t['name'] for t in tools}),15)
         for t in tools:
             McpToolDescriptor(name=t['name'],description=t['description'],input_schema=t['inputSchema'])
 
@@ -78,7 +78,7 @@ class Tests(unittest.TestCase):
         with self.assertRaisesRegex(ToolError,'Optimization is disabled'):
             self.service.call('start_atrex_optimization',self.ref)
         plan=self.service.call('prepare_atrex_optimization',self.ref)
-        self.assertIn('MODEL_BACKEND_NOT_CONFIGURED',plan['blockers'])
+        self.assertIn('GPU_RUNNER_NOT_CONFIGURED',plan['blockers'])
         self.assertFalse(self.service.call('get_atrex_status',{})['execution_enabled'])
 
     def test_document_allowlist_and_paging(self):

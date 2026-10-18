@@ -12,11 +12,16 @@ services:
       PYTHONPATH: /sdk/src
       PYTHONDONTWRITEBYTECODE: "1"
       NEXUS_ROUTER_URL: http://router:7446
+      NEXUS_TENANT: ${NEXUS_TENANT:-default}
+      NEXUS_AGENT_ID: ${NEXUS_AGENT_ID:-atrex-mcp}
       HOME: /tmp
       NO_PROXY: "*"
+      ATREX_EXECUTION_SOCKET: /execution/control.sock
     volumes:
       - ./agent.py:/app/agent.py:ro
       - ./service.py:/app/service.py:ro
+      - ./execution.py:/app/execution.py:ro
+      - ./broker-state/control:/execution:ro
       - ../sdk/src:/sdk/src:ro
       - ./upstream:/upstream:ro
       - ./data:/data:rw

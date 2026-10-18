@@ -4,6 +4,16 @@ from unittest.mock import Mock
 from nexus_agent.credentials import ProviderCredentials
 
 class CredentialsTests(unittest.TestCase):
+    def test_force_new_is_explicit_and_typed(self):
+        context=SimpleNamespace(interaction_url='https://cloud.test/callback/',_interaction_request=Mock(return_value={'status':'pending'}))
+        client=ProviderCredentials(context)
+        client.authorize('nexus',0,force_new=True)
+        self.assertEqual(context._interaction_request.call_args.kwargs['payload'],{'provider':'nexus','force_new':True})
+        with self.assertRaises(ValueError):client.authorize('nexus',0,force_new='true')
+    def test_custom_endpoint_and_model_are_nonsecret_request_metadata(self):
+        context=SimpleNamespace(interaction_url='https://cloud.test/callback/',_interaction_request=Mock(return_value={'status':'pending'}))
+        ProviderCredentials(context).authorize('custom_openai',0,base_url='https://example.com/v1',model='gpt-6-sol')
+        self.assertEqual(context._interaction_request.call_args.kwargs['payload'],{'provider':'custom_openai','base_url':'https://example.com/v1','model':'gpt-6-sol'})
     def test_request_contains_no_secret_and_resolution_is_separate(self):
         aid='12345678-1234-1234-1234-123456789abc'
         context=SimpleNamespace(interaction_url='https://cloud.test/callback/',_interaction_request=Mock(return_value={'authorization_id':aid,'status':'pending'}))

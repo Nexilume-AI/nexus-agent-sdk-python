@@ -13,12 +13,17 @@ class ProviderCredentials:
             raise RuntimeError('Provider authorization requires an HTTPS Cloud Run context.')
         return self.context._interaction_request('credentials/' + path, method=method, payload=payload)
 
-    def authorize(self, provider, wait_seconds=15):
-        if provider not in ('openai', 'anthropic', 'nexus'):
+    def authorize(self, provider, wait_seconds=15, *, base_url=None, model=None, force_new=False):
+        if provider not in ('openai', 'anthropic', 'nexus', 'custom_openai', 'custom_anthropic'):
             raise ValueError('Unsupported provider')
         if type(wait_seconds) is not int or not 0 <= wait_seconds <= 20:
             raise ValueError('wait_seconds must be 0..20')
-        value = self._request('', 'POST', {'provider':provider})
+        payload = {'provider':provider}
+        if base_url is not None:payload['base_url']=base_url
+        if model is not None:payload['model']=model
+        if type(force_new) is not bool:raise ValueError('force_new must be a boolean')
+        if force_new:payload['force_new']=True
+        value = self._request('', 'POST', payload)
         deadline = time.monotonic() + wait_seconds
         while value.get('status') == 'pending' and time.monotonic() < deadline:
             time.sleep(min(1, max(0, deadline-time.monotonic())))

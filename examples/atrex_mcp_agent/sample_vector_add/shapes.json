@@ -1,0 +1,4 @@
+{
+  "eval_small": {"init_kwargs": {}, "input_kwargs": {"n": 8192}},
+  "eval_large": {"init_kwargs": {}, "input_kwargs": {"n": 262144}}
+}
