@@ -1,0 +1,37 @@
+"""Provider authorization through Cloud URL elicitation; secrets never become tool results."""
+import time
+import uuid
+from urllib.parse import urlsplit
+
+
+class ProviderCredentials:
+    def __init__(self, context):
+        self.context = context
+
+    def _request(self, path, method, payload=None):
+        if urlsplit(self.context.interaction_url).scheme != 'https':
+            raise RuntimeError('Provider authorization requires an HTTPS Cloud Run context.')
+        return self.context._interaction_request('credentials/' + path, method=method, payload=payload)
+
+    def authorize(self, provider, wait_seconds=15):
+        if provider not in ('openai', 'anthropic', 'nexus'):
+            raise ValueError('Unsupported provider')
+        if type(wait_seconds) is not int or not 0 <= wait_seconds <= 20:
+            raise ValueError('wait_seconds must be 0..20')
+        value = self._request('', 'POST', {'provider':provider})
+        deadline = time.monotonic() + wait_seconds
+        while value.get('status') == 'pending' and time.monotonic() < deadline:
+            time.sleep(min(1, max(0, deadline-time.monotonic())))
+            value = self.status(value['authorization_id'])
+        return value
+
+    def status(self, authorization_id):
+        return self._request(str(uuid.UUID(authorization_id)) + '/', 'GET')
+
+    def resolve_for_runtime(self, authorization_id):
+        """Trusted execution code only. Never return this dictionary from an MCP tool.
+
+        Each resolution rechecks caller scope, grant expiry/revocation and active Run.
+        Do not persist, log, put in prompts, or cache beyond the authorized operation.
+        """
+        return self._request(str(uuid.UUID(authorization_id)) + '/', 'POST', {})
