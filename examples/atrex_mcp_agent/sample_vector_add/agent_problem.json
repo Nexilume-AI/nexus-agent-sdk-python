@@ -1,0 +1,14 @@
+{
+  "schema_version": "atrex.agent_problem.v1",
+  "objective": "Implement contiguous float32 vector addition on a Pascal CUDA GPU, preserving reference correctness while reducing measured end-to-end latency.",
+  "evaluation": {"exact_cases": "private", "development_cases_are_evaluation_cases": false},
+  "operator_contract": {
+    "inputs": {"x": "contiguous CUDA float32 vector of length N", "y": "contiguous CUDA float32 vector of length N"},
+    "output": "CUDA float32 vector z of length N with z[i] = x[i] + y[i]",
+    "interface": "torch.nn.Module Model, no constructor arguments, forward(x, y)"
+  },
+  "shape_domain": {"N": {"minimum": 1, "maximum": 1048576}},
+  "invariants": ["Do not modify inputs", "No CPU copies or hardcoded evaluation inputs", "Support arbitrary N in the stated range"],
+  "coverage_regimes": [{"name": "launch-bound small vectors"}, {"name": "memory-bound larger vectors"}],
+  "development_cases": [{"name": "synthetic_development", "init_kwargs": {}, "input_kwargs": {"n": 4096}}]
+}

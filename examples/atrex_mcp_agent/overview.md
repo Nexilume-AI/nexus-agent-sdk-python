@@ -1,68 +1,67 @@
 # Atrex Kernel Agent MCP
 
-Prepare GPU kernel optimization projects through MCP, backed by a pinned checkout of
+Run bounded GPU kernel optimization jobs through MCP using the official
 [Alibaba Atrex Kernel Agent](https://github.com/alibaba/atrex-kernel-agent).
 This is a community Nexus integration, not an official Alibaba-hosted service.
 
-## Current availability: preparation only
+## Workflow
 
-The MCP service is online. **A model backend and isolated GPU execution runner have
-not been configured.** This release cannot optimize kernels, run benchmarks, stream
-optimization progress, or return generated performance results. Calling
-`start_atrex_optimization` returns `MODEL_BACKEND_NOT_CONFIGURED` and starts no work.
+Create a private project, upload native Atrex-Bench operator inputs,
+validate them, and authorize your model provider on the secure Nexus Cloud page.
+Start optimization with your model name and budget limits. The call returns a job
+ID immediately; query real optimizer progress, cancel work, and download generated
+source, reports and logs through paged MCP artifact tools with SHA256 verification.
 
-## What you can do now
+## Credentials and isolation
 
-- Read the official documentation from the deployed upstream revision.
-- Create a private persistent project and upload operator definitions and source files.
-- Check SOL-ExecBench or Atrex-Bench file layouts and JSON syntax without executing code.
-- Inspect file manifests and download uploaded files with pagination and SHA256 checks.
-- Prepare a bounded optimization plan and see the missing execution prerequisites.
-- Authorize a supported model provider through a private Cloud page, with expiry and revocation.
+You supply your own model authorization. Keys are entered only on an authenticated
+Cloud page, encrypted at rest, and never returned in MCP results. Jobs use a scoped
+model proxy, recheck expiry/revocation, and run in separate containers without
+network access, host credentials or Docker control. Your model provider charges
+model usage; the Marketplace listing does not include model credits.
 
-## Typical MCP workflow
+Choose Nexus Cloud, OpenAI, Anthropic, or a custom compatible HTTPS endpoint,
+an exact model and an authorization lifetime. Reuse an eligible saved credential
+or enter a new key on the secure page. Changing endpoint/model requires explicit
+approval; revoking a saved credential also disables grants derived from it.
+Custom OpenAI-compatible services must support Responses; custom Anthropic
+compatible services must support Messages. Private network endpoints are rejected.
 
-1. Call `get_atrex_status` to check readiness.
-2. Call `create_atrex_project` with a project name. Keep its `project_id` and
-   `access_key` private; use both for every subsequent project call.
-3. Call `upload_atrex_file` for `reference.py`, `definition.json`, and
-   `workload.jsonl` (SOL-ExecBench), or `reference.py`, `input.py`, and `shapes.json`
-   (Atrex-Bench). Send at most 1024 characters per call, starting at `offset=0`,
-   then continue with the returned `next_offset` in bytes. Retry identical chunks
-   safely and compare the final SHA256 with your source. File-layout validation
-   does not establish evaluator completeness.
-4. Call `validate_atrex_project`, then `prepare_atrex_optimization` to inspect a plan.
-5. Use `get_atrex_project` and `read_atrex_file` to retrieve your inputs. Decode and
-   concatenate the base64 pages using `next_offset`, then verify the full SHA256.
+Nexus Cloud users can select an accessible Router and model directly in a supported
+MCP client's confirmation UI, with no API key or endpoint to enter. A secure page
+provides the same selection for other clients. Temporary access is restricted to
+the chosen Router/model and lifetime; model usage is billed to that Router context.
+Use `force_new` to choose new credentials without changing running jobs.
 
-## Limits and privacy
+## Hardware and limits
 
-Files are never executed in this release. Each project is protected by a random bearer
-access key; anyone who obtains that key can access the project. Do not share it publicly.
-Projects persist until operator cleanup. Each project supports up to 64 files / 2 MiB,
-with a 256 KiB file limit. Download pages are bounded to 24 KiB for Relay compatibility.
+Check `get_atrex_status` before starting. This host supports CUDA on Pascal GPUs
+(compute capability 6.0). Modern Triton and Nsight hardware-counter profiling are
+not available. SOL-ExecBench inputs support static preparation only because the
+current official evaluator requires a newer GPU software stack. The official optimizer runs correctness and timing evaluation;
+read its reports to determine whether a candidate actually improved performance.
 
-MCP supports Streamable HTTP through Nexus Cloud and OpenWrt Relay. Model generation
-and GPU compute are disabled and therefore not included in this free preparation listing.
-Execution capabilities and any future compute pricing will require a separate update.
+One active job at a time, maximum 55 minutes and 20 iterations, with a separate
+80-model-request ceiling. The optimizer token budget is a soft stop between stages;
+a stage can exceed it, so it is not a hard spending cap. Uploads use 1024-character chunks;
+inputs are limited to 2 MiB/project. Artifact downloads use 24 KiB base64 pages.
+Keep your project access key private. Jobs require the same authorized caller.
 
-## Secure provider authorization
+Interrupted services do not silently resume model spending. Outputs remain
+available after failure/cancellation when successfully collected. Download files
+from the manifest instead of rerunning a job to retrieve them.
 
-Call `authorize_atrex_provider` with `provider` set to `openai`, `anthropic`, or
-`nexus`. MCP clients supporting URL elicitation receive an authorization prompt;
-other clients receive a secure link. Open it and sign in as the owner of the personal
-Agent API key used by your MCP client. Enter the provider key on that page and
-explicitly approve a lifetime of 5 minutes to 24 hours (default: 1 hour).
+Optimizer revision: `7247206287ef2747342eccb89421fa4606368e2d` (Apache-2.0).
 
-The client can initiate authorization automatically and reuse your approval until
-expiry or revocation. First-use consent is yours; this flow does not access a client's
-own login tokens. Cloud encrypts provider secrets and returns only authorization
-status and an opaque reference to MCP. Grants are isolated by caller, tenant, project
-and Agent. Reopen the same page to revoke access. Never put provider credentials in
-chat, uploaded files or tool arguments. Shared/unowned API keys are not supported.
+## Live task progress
 
-Authorization is available now, but model invocation and GPU execution remain
-disabled pending the execution integration. Authorizing a provider alone does not
-start an optimization job or incur model usage through this Agent.
+New optimization jobs return a private live page URL. Sign in as the caller to
+follow execution stages, elapsed time, model request counts and streamed logs,
+cancel a job, and download verified artifacts when uploaded. The page uses SSE
+push with replay after disconnection; it does not repeatedly query job status.
 
-Upstream revision: `7247206287ef2747342eccb89421fa4606368e2d`. Upstream license: Apache-2.0.
+MCP clients can use `watch_atrex_job` with a progress token for streamed events.
+Resume with the last event sequence after the bounded watch ends. Clients without
+stream notifications can open the live page. Closing a page or watch does not
+cancel the task. Fifteen MCP tools are registered with complete input schemas.
+Performance gains remain subject to the official correctness/timing reports.

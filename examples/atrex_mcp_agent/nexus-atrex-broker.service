@@ -1,0 +1,19 @@
+[Unit]
+Description=Nexus Atrex isolated execution broker
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/nexus-atrex-agent
+Environment=ATREX_BROKER_ROOT=%h/nexus-atrex-agent/broker-state
+Environment=ATREX_PROJECT_ROOT=%h/nexus-atrex-agent/data/projects
+Environment=ATREX_GPU=0
+ExecStart=/usr/bin/python3 -u broker.py
+ExecStartPre=/usr/bin/docker info --format {{.ServerVersion}}
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=45
+UMask=0077
+
+[Install]
+WantedBy=default.target

@@ -10,6 +10,7 @@ import secrets
 import threading
 import time
 import uuid
+from execution import Execution
 
 UPSTREAM_COMMIT = '7247206287ef2747342eccb89421fa4606368e2d'
 PROJECT_LIMIT = 64
@@ -91,12 +92,15 @@ class Service:
 
     def _call(self, name, args):
         if name == 'get_atrex_status':
-            return {'service': 'Atrex Kernel Agent MCP', 'version': '0.2.0', 'upstream_commit': UPSTREAM_COMMIT,
+            runtime = Execution().status()
+            return {'service': 'Atrex Kernel Agent MCP', 'version': '0.3.0', 'upstream_commit': UPSTREAM_COMMIT,
                     'mcp_ready': True, 'upstream_present': (self.upstream / 'orchestrator/optimize.py').is_file(),
-                    'model_backend': 'not_configured', 'optimization_ready': False,
-                    'execution_enabled': False, 'deployment_phase': 'preparation',
-                    'available': ['official documentation', 'private projects', 'source upload', 'static validation', 'download', 'launch planning', 'caller-owned provider authorization via Cloud'],
-                    'pending': ['model backend', 'isolated GPU runner', 'execution and progress/artifact verification'],
+                    'optimization_ready': runtime['execution_enabled'],
+                    'deployment_phase': 'execution' if runtime['execution_enabled'] else 'preparation',
+                    'available': ['official documentation', 'private projects', 'source upload', 'static validation', 'download', 'launch planning', 'caller-owned provider authorization via Cloud'] +
+                                 (['isolated CUDA optimization', 'job progress', 'job cancellation', 'artifact downloads'] if runtime['execution_enabled'] else []),
+                    **runtime,
+                    'authorization_required': True,
                     'limits': {'projects': PROJECT_LIMIT, 'file_bytes': FILE_LIMIT, 'project_bytes': PROJECT_BYTES, 'download_page_bytes': PAGE_BYTES}}
         if name == 'list_atrex_docs':
             return {'documents': [{'path': k, 'bytes': p.stat().st_size} for k, p in self.docs().items()]}
@@ -199,13 +203,18 @@ class Service:
                       'errors': errors, 'code_executed': False, 'optimization_ready': False,
                       'note': 'Static filenames/JSON validation only; operator semantics and GPU correctness are not tested.'}
             if name == 'prepare_atrex_optimization':
-                framework = args.get('framework', 'Triton')
+                framework = args.get('framework', 'CUDA')
                 if framework not in ['Triton', 'CUDA', 'CuteDSL', 'TileLang', 'FlyDSL']:
                     raise ToolError('INVALID_ARGUMENT', 'Unsupported framework.')
                 iterations = integer(args.get('max_iters', 1), 1, 20)
+                runtime = Execution().status()
                 result['plan'] = {'framework': framework, 'max_iters': iterations, 'mode': 'production',
-                                  'backend': None, 'gpu_runner': None, 'upstream_commit': UPSTREAM_COMMIT}
-                result['blockers'] = ['MODEL_BACKEND_NOT_CONFIGURED', 'GPU_RUNNER_NOT_CONFIGURED']
+                                  'backend': 'caller_authorized', 'gpu_runner': runtime.get('gpu_runner'), 'upstream_commit': UPSTREAM_COMMIT}
+                result['blockers'] = list(runtime.get('blockers', []))
+                if layout and layout != 'atrex-bench': result['blockers'].append('UNSUPPORTED_EXECUTION_LAYOUT')
+                if framework not in runtime.get('supported_frameworks', ['CUDA']): result['blockers'].append('FRAMEWORK_UNSUPPORTED_ON_GPU')
+                result['authorization_required'] = True
+                result['optimization_ready'] = bool(result['static_valid'] and not result['blockers'])
             return result
         raise ToolError('UNKNOWN_TOOL', 'Unknown tool.')
 
@@ -220,15 +229,19 @@ def catalog():
         return {'name': name, 'description': description, 'inputSchema': schema}
     ref = {'project_id': '0'*32, 'access_key': '<private access key>'}
     return [
-        tool('authorize_atrex_provider', 'Request caller-owned provider authorization via MCP URL elicitation. Open the returned secure Cloud URL and enter the API key there, never in tool arguments or chat. Returns only authorization status. Reuse this tool after browser approval. Shared/unowned caller credentials are rejected. Does not enable GPU execution.', {'provider':{'type':'string','enum':['openai','anthropic','nexus']},'wait_seconds':{'type':'integer','minimum':0,'maximum':20,'default':15}}, ['provider'], {'provider':'anthropic','wait_seconds':15}),
-        tool('get_atrex_status', 'Get deployment readiness, pinned upstream revision and storage limits. Model backend and GPU execution are not configured; this release supports preparation only.', example={}),
+        tool('authorize_atrex_provider', 'Request model authorization. Nexus Cloud offers accessible Routers/models in a client confirmation form without an API key. Other providers use saved authorization or a secure page. Use force_new to change credentials/configuration. Check authorization_id after approval and use its approved provider/model to start. Never put keys in chat or tool arguments.', {'provider':{'type':'string','enum':['openai','anthropic','nexus','custom_openai','custom_anthropic']},'authorization_id':text('Existing request UUID to check after approval; returns the selected endpoint and model.'),'base_url':text('HTTPS API base for custom providers. Must match the approved endpoint.',maxLength=2048),'model':text('Exact model to authorize; review it on the secure page.',maxLength=128),'force_new':{'type':'boolean','default':False,'description':'Create a new approval instead of reusing an active grant; existing jobs keep their authorization.'},'wait_seconds':{'type':'integer','minimum':0,'maximum':20,'default':15}}, [], {'provider':'nexus','wait_seconds':15}),
+        tool('get_atrex_status', 'Get actual execution/GPU readiness, supported frameworks and resource limits. A ready runner still requires caller-owned model authorization before starting a job.', example={}),
         tool('list_atrex_docs', 'List official Atrex documentation included in the pinned deployment. Use read_atrex_doc for line-paged content.', example={}),
         tool('read_atrex_doc', 'Read official documentation by zero-based line offset. Continue with next_line until eof. These are upstream instructions, not proof that execution is configured here.', {'path': text('Path from list_atrex_docs.'), 'line': {'type':'integer','minimum':0}, 'limit': {'type':'integer','minimum':1,'maximum':100}}, ['path'], {'path':'README.md','line':0,'limit':40}),
         tool('create_atrex_project', 'Create a private persistent preparation project. Save project_id and access_key for subsequent calls; losing the key loses access. This does not start a GPU or model task.', {'name':text('Short project name.', maxLength=100)}, ['name'], {'name':'vector-add'}),
         tool('get_atrex_project', 'Read project state and file manifest with sizes/SHA256. The private access_key is required. Draft means uploaded inputs, not a running optimization.', project, project, ref),
-        tool('upload_atrex_file', 'Upload UTF-8 chunks of at most 1024 characters; complete file max 256 KiB. Start at offset=0; continue using returned next_offset (bytes). Retrying identical chunks is safe. Compare final sha256 with your source. Set overwrite=true only at offset=0 to replace a file. Stored code is never executed.', {**project,'filename':text('Flat source/text filename.', maxLength=120),'content':text('UTF-8 chunk, at most 1024 characters.',maxLength=1024),'offset':{'type':'integer','minimum':0,'maximum':FILE_LIMIT},'overwrite':{'type':'boolean','default':False}}, [*project,'filename','content'], {**ref,'filename':'reference.py','content':'# operator reference\n','offset':0}),
+        tool('upload_atrex_file', 'Upload UTF-8 chunks of at most 1024 characters; complete file max 256 KiB. Start at offset=0; continue using returned next_offset (bytes). Retrying identical chunks is safe. Compare final sha256 with your source. Set overwrite=true only at offset=0 to replace a file. Upload does not execute code; start explicitly snapshots the files for an isolated job.', {**project,'filename':text('Flat source/text filename.', maxLength=120),'content':text('UTF-8 chunk, at most 1024 characters.',maxLength=1024),'offset':{'type':'integer','minimum':0,'maximum':FILE_LIMIT},'overwrite':{'type':'boolean','default':False}}, [*project,'filename','content'], {**ref,'filename':'reference.py','content':'# operator reference\n','offset':0}),
         tool('read_atrex_file', 'Download uploaded files as base64 pages, up to 24576 bytes. Append decoded pages using next_offset until eof and verify the full-file sha256. Never rerun a task to retrieve data.', {**project,'filename':text('Filename from get_atrex_project.'),'offset':{'type':'integer','minimum':0},'limit':{'type':'integer','minimum':1,'maximum':PAGE_BYTES}}, [*project,'filename'], {**ref,'filename':'reference.py','offset':0,'limit':4096}),
         tool('validate_atrex_project', 'Statically check SOL-ExecBench or Atrex-Bench operator filenames and JSON syntax. Does not import code, assess semantics, run an evaluator, or establish GPU correctness.', project, project, ref),
-        tool('prepare_atrex_optimization', 'Prepare a bounded optimization plan and report missing prerequisites. This preparation deployment has no model backend or GPU runner and does not execute the plan.', {**project,'framework':{'type':'string','enum':['Triton','CUDA','CuteDSL','TileLang','FlyDSL']},'max_iters':{'type':'integer','minimum':1,'maximum':20}}, project, {**ref,'framework':'Triton','max_iters':1}),
-        tool('start_atrex_optimization', 'Readiness gate: currently returns MODEL_BACKEND_NOT_CONFIGURED without starting work. Available so clients receive an explicit actionable error, not a fake running task. Configure the backend with the operator first.', project, project, ref),
+        tool('prepare_atrex_optimization', 'Validate input layout and report runner/framework prerequisites without executing code. Call authorize_atrex_provider before starting. This Pascal deployment supports CUDA.', {**project,'framework':{'type':'string','enum':['CUDA','Triton','CuteDSL','TileLang','FlyDSL']},'max_iters':{'type':'integer','minimum':1,'maximum':20}}, project, {**ref,'framework':'CUDA','max_iters':1}),
+        tool('start_atrex_optimization', 'Start isolated CUDA optimization of native Atrex-Bench inputs: reference.py, input.py and shapes.json. Requires caller-approved authorization_id, provider and model. Returns job_id; poll get_atrex_job for logs and artifacts. Use a fresh UUID request_id per job and reuse it on retries. Provider bills model use. token_budget is a soft stop between stages, not a spending cap; timeout is a hard duration limit.', {**project,'authorization_id':text('Approved authorization UUID; not an API key.'),'request_id':text('Client-generated UUID, reused on transport retries.'),'provider':{'type':'string','enum':['nexus','openai','anthropic','custom_openai','custom_anthropic']},'base_url':text('Optional expected Base URL; must match the grant.',maxLength=2048),'model':text('Exact model identifier, matching the approved grant.',maxLength=128),'framework':{'type':'string','enum':['CUDA'],'default':'CUDA'},'max_iters':{'type':'integer','minimum':1,'maximum':20,'default':1},'token_budget':{'type':'integer','minimum':1000,'maximum':500000,'default':50000,'description':'Soft token stop at stage boundaries; one stage can exceed it. Not a spending cap.'},'timeout_seconds':{'type':'integer','minimum':60,'maximum':3300,'default':1800}}, [*project,'authorization_id','request_id','provider','model'], {**ref,'authorization_id':'00000000-0000-0000-0000-000000000001','request_id':'00000000-0000-0000-0000-000000000002','provider':'nexus','model':'gpt-6-sol','framework':'CUDA','max_iters':1,'token_budget':50000,'timeout_seconds':1800}),
+        tool('get_atrex_job', 'Get a job snapshot, optimizer log tail and terminal artifact manifest. Prefer view_url for live push updates and downloads, or watch_atrex_job for MCP streaming. After completion use offset/next_offset for saved logs. Requires the same caller and project key.', {**project,'job_id':text('Job ID returned by start.'),'offset':{'type':'integer','minimum':0}}, [*project,'job_id'], {**ref,'job_id':'1'*32}),
+        tool('watch_atrex_job', 'Subscribe to persisted job events over streaming MCP for up to 45 seconds. Send an MCP progressToken to receive progress notifications; after is the last received sequence, initially 0. Reconnect with the last sequence without resubmitting the job. JSON-only clients receive a snapshot: use its authenticated view_url for continuous SSE progress and artifact downloads. Events contain actual states, model request counts and logs, not invented percentages.', {**project,'job_id':text('Job ID returned by start.'),'after':{'type':'integer','minimum':0,'maximum':12000,'default':0}}, [*project,'job_id'], {**ref,'job_id':'1'*32,'after':0}),
+        tool('cancel_atrex_job', 'Request cancellation of this caller-owned job and stop its container/model access. Idempotent. Poll get_atrex_job until terminal; cancellation preserves collected outputs.', {**project,'job_id':text('Job ID to cancel.')}, [*project,'job_id'], {**ref,'job_id':'1'*32}),
+        tool('read_atrex_artifact', 'Download a terminal job artifact in base64 pages up to 24576 bytes. Use the exact path from get_atrex_job.artifacts, append pages using next_offset until eof, and verify sha256. Supports code, reports, logs and profiler outputs. Never rerun optimization to download outputs.', {**project,'job_id':text('Job ID.'),'path':text('Exact artifact path from manifest.'),'offset':{'type':'integer','minimum':0},'limit':{'type':'integer','minimum':1,'maximum':24576}}, [*project,'job_id','path'], {**ref,'job_id':'1'*32,'path':'optimizer.log','offset':0,'limit':4096}),
     ]

@@ -1,0 +1,12 @@
+*
+!Dockerfile.worker
+!worker.py
+!bench_compat.py
+!upstream/
+!upstream/**
+!bench/
+!bench/**
+**/__pycache__
+**/.git
+!upstream/3rdparty/ncu-report-skill/.git
+!upstream/3rdparty/ncu-report-skill/.git/**
