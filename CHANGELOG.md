@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.51.0 — 2026-10-20
+
+- Add caller-owned Provider authorization through `ProviderCredentials`, with
+  MCP form/URL elicitation and explicit consent. Credentials are entered on the
+  Cloud authorization page, not in tool arguments or chat messages.
+- Add background job execution and live task event reporting, including
+  progress, cancellation and recovery contracts.
+- Include the Atrex MCP example and authorization/event regression tests.
+- These features require a compatible Nexus Cloud deployment. Existing
+  `nexus_agent` imports, CLI names and Computer pairing remain unchanged.
+
 ## 0.50.0 — 2026-10-17
 
 - Add a deployable OpenROAD MCP bridge with discovered tool schemas, Yosys/EDA

@@ -47,10 +47,10 @@ On Ubuntu, install `python3-venv` if creating the environment reports that `ensu
 
 ### 2. Install from PyPI
 
-Install the 0.50.0 release from [PyPI](https://pypi.org/project/nexilume/0.50.0/):
+Install the 0.51.0 release from [PyPI](https://pypi.org/project/nexilume/0.51.0/):
 
 ```sh
-python -m pip install nexilume==0.50.0
+python -m pip install nexilume==0.51.0
 python -c "import nexus_agent; print(nexus_agent.__version__)"
 ```
 
@@ -59,12 +59,12 @@ Use `python -m pip install --upgrade nexilume` for the latest release. The distr
 For optional features, install only the extras you need:
 
 ```sh
-python -m pip install "nexilume[computer,browser,fastmcp,a2a]==0.50.0"
+python -m pip install "nexilume[computer,browser,fastmcp,a2a]==0.51.0"
 ```
 
 Migrating from our older `nexus-openwrt-agent-sdk` wheel? In the same environment, run `python -m pip uninstall nexus-openwrt-agent-sdk` **before** installing `nexilume`. Do not keep both distributions installed: they share the same import directory. Keep your Runtime configuration and device keys. See [Computer Runtime upgrade](#upgrade-an-existing-computer-runtime) before restarting an existing service.
 
-For offline installation, download the wheel from [PyPI release files](https://pypi.org/project/nexilume/0.50.0/#files) and use `python -m pip install ./nexilume-0.50.0-py3-none-any.whl`. Optional dependencies must also be available offline. Older wheels remain in [GitHub Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases) for historical use.
+For offline installation, download the wheel from [PyPI release files](https://pypi.org/project/nexilume/0.51.0/#files) and use `python -m pip install ./nexilume-0.51.0-py3-none-any.whl`. Optional dependencies must also be available offline. Older wheels remain in [GitHub Releases](https://github.com/Nexilume-AI/nexus-agent-sdk-python/releases) for historical use.
 
 | Extra | Enables |
 | --- | --- |
@@ -444,7 +444,7 @@ published as Run outputs.
 Activate the **same virtual environment used to install Runtime**. If it contains the older `nexus-openwrt-agent-sdk` distribution, uninstall that package first; do not run `nexus-computer unpair` or delete device keys. Then install the current package and restart:
 
 ```sh
-python -m pip install --upgrade "nexilume[computer,browser]==0.50.0"
+python -m pip install --upgrade "nexilume[computer,browser]==0.51.0"
 nexus-computer restart
 nexus-computer status
 ```
