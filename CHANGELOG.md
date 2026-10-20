@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.51.1 — 2026-10-20
+
+- Make the cooperative Queue/Steer example uploadable as a hosted Python Agent,
+  while preserving enrolled Router execution and automatic discovery.
+- Allow a bounded step count and return exact applied instruction IDs and text,
+  so callers can verify that edited guidance was used and withdrawn input was not.
+- Add hosted-import and acknowledgement regression tests. The example is included
+  in the source distribution; the runtime import remains `nexus_agent`.
+- Pending Steer editing and withdrawal require an updated Nexus Cloud. Instructions
+  already received by the Agent cannot be recalled or changed retroactively.
+
 ## 0.51.0 — 2026-10-20
 
 - Add caller-owned Provider authorization through `ProviderCredentials`, with
