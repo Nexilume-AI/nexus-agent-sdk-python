@@ -14,6 +14,12 @@ class ProviderCredentials:
         return self.context._interaction_request('credentials/' + path, method=method, payload=payload)
 
     def authorize(self, provider, wait_seconds=15, *, base_url=None, model=None, force_new=False):
+        """Request web approval, or return explicit MCP-config preauthorization.
+
+        Always use the returned provider/base_url/model: caller configuration can
+        override tool defaults (including force_new). Keys stay at the Cloud
+        boundary and must never be supplied as arguments to this method.
+        """
         if provider not in ('openai', 'anthropic', 'nexus', 'custom_openai', 'custom_anthropic'):
             raise ValueError('Unsupported provider')
         if type(wait_seconds) is not int or not 0 <= wait_seconds <= 20:

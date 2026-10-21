@@ -4,6 +4,16 @@ from unittest.mock import Mock
 from nexus_agent.credentials import ProviderCredentials
 
 class CredentialsTests(unittest.TestCase):
+    def test_config_preauthorization_returns_approved_scope_without_polling(self):
+        approved={'status':'authorized','authorization_id':'12345678-1234-1234-1234-123456789abc',
+            'preauthorized':True,'provider':'custom_openai','base_url':'https://caller.example/v1','model':'caller-model'}
+        context=SimpleNamespace(interaction_url='https://cloud.test/callback/',_interaction_request=Mock(return_value=approved))
+        value=ProviderCredentials(context).authorize('nexus',20,model='tool-default',force_new=True)
+        self.assertEqual(value,approved)
+        self.assertNotIn('secret',value)
+        context._interaction_request.assert_called_once_with('credentials/',method='POST',
+            payload={'provider':'nexus','model':'tool-default','force_new':True})
+
     def test_force_new_is_explicit_and_typed(self):
         context=SimpleNamespace(interaction_url='https://cloud.test/callback/',_interaction_request=Mock(return_value={'status':'pending'}))
         client=ProviderCredentials(context)

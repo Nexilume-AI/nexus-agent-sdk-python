@@ -1,0 +1,16 @@
+# Optional upstream model preauthorization for this MCP Agent.
+# Environment variables contain keys; never put them in tool arguments.
+[mcp_servers.my_agent]
+url = "https://cloud.nexilume.com/api/v1/agents/<agent-id>/mcp/"
+bearer_token_env_var = "NEXUS_MCP_API_KEY"
+
+[mcp_servers.my_agent.http_headers]
+X-Nexus-Tenant = "<tenant-id>"
+X-Nexus-Upstream-Preauthorize = "true"
+X-Nexus-Upstream-Provider = "custom_openai"
+X-Nexus-Upstream-Endpoint = "https://api.example.com/v1"
+X-Nexus-Upstream-Model = "<model-id>"
+X-Nexus-Upstream-TTL-Seconds = "3600"
+
+[mcp_servers.my_agent.env_http_headers]
+X-Nexus-Upstream-Key = "NEXUS_UPSTREAM_API_KEY"
