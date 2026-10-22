@@ -1,0 +1,4 @@
+# Build from the tested optional image; no Rust rebuild is required.
+ARG BASE_IMAGE=nexus-wave-mcp:0b8c5fff11c9-optionals-20261022
+FROM ${BASE_IMAGE}
+COPY worker.py /opt/nexus-wave-worker.py

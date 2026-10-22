@@ -67,6 +67,47 @@ def list_wave_files(prefix: str = '', offset: int = 0, limit: int = 100) -> dict
             'next_offset':offset+limit, 'eof':offset+limit>=len(files), 'total':len(files)}
 
 
+@server.mcp.tool()
+def _nexus_export_wave_view(view_id: str, export: bool = False) -> dict[str, Any]:
+    """Private bridge RPC; never advertise through the public agent."""
+    import copy
+    from wave_mcp.viewer.manager import ViewManager, _fst_meta
+    from wave_mcp.viewer.translate import desired_to_sucl
+    if not re.fullmatch(r'[a-f0-9]{8}', view_id):
+        raise ValueError('Invalid view ID.')
+    view = ViewManager.instance()._views.get(view_id)
+    if not view:
+        raise ValueError('View has expired.')
+    desired = view['state'].snapshot()['desired']
+    sources = desired['waveform']['sources']
+    if not 1 <= len(sources) <= 2:
+        raise ValueError('Use one or two waveforms.')
+    panels, files = [], []
+    for i, source in enumerate(sources):
+        state = copy.deepcopy(desired)
+        state['waveform']['sources'] = [source]
+        state['signals'] = [s for s in state.get('signals', []) if not s.get('source') or s['source'] == source['id']]
+        _, timescale = _fst_meta(source['path'])
+        if timescale is None:
+            raise ValueError('Waveform timescale is unavailable.')
+        panels.append({'label': source.get('label') or 'Waveform '+str(i+1),
+                       'commands': desired_to_sucl(state, timescale)})
+        if export:
+            path = Path(source['path']).resolve()
+            # Converted cache files can be in /tmp; copy only an already-open, resolved FST.
+            if not (path.is_relative_to('/work') or path.is_relative_to('/tmp')) or not path.is_file() or path.stat().st_size > 268435456:
+                raise ValueError('Waveform outside workspace or too large.')
+            dest = safe_file('.nexus-exports/'+view_id+'/'+str(i)+'.fst')
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                os.link(path, dest)
+            except OSError:
+                shutil.copyfile(path, dest)
+            files.append(str(dest))
+    notes = desired.get('annotations') or []
+    return {'snapshot': {'panels': panels, 'annotation': '\n'.join(str(n.get('markdown', '')) for n in notes)}, 'files': files}
+
+
 if __name__ == '__main__':
     if os.environ.get('WAVE_SAMPLE') == '1':
         import importlib.util

@@ -30,7 +30,12 @@ def main():
                 inbox=queue.Queue(maxsize=1)
                 def run():
                     try:inbox.put(call(args))
-                    except Exception:inbox.put(native({'content':[{'type':'text','text':'Wave worker failed; create a new workspace if it expired.'}],'isError':True}))
+                    except Exception as exc:
+                        import traceback
+                        # Stack locations only: never log callback tokens, URLs, or payloads.
+                        locations=[(os.path.basename(f.filename),f.lineno,f.name) for f in traceback.extract_tb(exc.__traceback__)]
+                        print('Wave request failed',type(exc).__name__,locations,flush=True)
+                        inbox.put(native({'content':[{'type':'text','text':'Wave worker failed; create a new workspace if it expired.'}],'isError':True}))
                 context=contextvars.copy_context()
                 threading.Thread(target=lambda:context.run(run),daemon=True).start()
                 yield SseEvent(event='progress',data=json.dumps({'progress':0,'message':'Processing isolated Wave MCP request'}))

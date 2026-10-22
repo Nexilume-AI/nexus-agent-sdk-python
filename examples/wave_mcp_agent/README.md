@@ -12,7 +12,8 @@ deployment user with permission to start Docker containers. Its internal HTTP
 listener binds only the Router Docker bridge (`WAVE_BRIDGE_ADDRESS`, default
 10.153.89.1), avoiding the firewall-blocked host IPv6 callback path.
 
-Workers use the fixed image `nexus-wave-mcp:0b8c5fff11c9`, run as a non-root UID,
+Workers default to `nexus-wave-mcp:public-viewer-20261022`; `WAVE_IMAGE`
+selects a tested optional image (see `deployment.json` and `OPTIONALS.md`). They run as a non-root UID,
 have no network or host mounts, drop all capabilities, use a read-only rootfs and
 a 256 MiB `/work` tmpfs. Memory is limited to 768 MiB, CPU to 1 and PIDs to 64.
 Four workspaces may run concurrently, with two per verified caller. Access requires
@@ -26,8 +27,11 @@ Upstream tool schemas retain argument types and constraints (cosmetic titles are
 removed), with required workspace credentials added. Descriptions summarize the
 operation within Router metadata limits. `wave_tool_help` provides complete
 original descriptions and schemas. Five viewer tools are excluded until the
-optional viewer assets are installed. FSDB requires a separately supplied Verdi
+optional viewer assets and an authenticated remote browser route are available. FSDB requires a separately supplied Verdi
 runtime. FST/VCD and static SystemVerilog are ready to use.
+
+See [OPTIONALS.md](OPTIONALS.md) for locally built viewer assets, Verible,
+fstdumper, build tools, version pins and remaining runtime requirements.
 
 ## Install / restore
 
@@ -87,5 +91,11 @@ These limits apply to one bridge process; run one instance for this deployment.
 
 Run `python3 -m unittest test_isolation -v` for deterministic isolation, quota,
 scheduling, timeout, shutdown and cleanup tests.
+
+## Public browser viewer
+
+The five viewer tools are enabled (45 total tools). Deploy matching Cloud viewer
+routes, migration 0066, Redis and trusted Surfer WASM assets before enabling this
+bridge. See `PUBLIC_VIEWER.md` for the capability flow, limits and deployment.
 
 Set `NEXUS_TENANT` and `NEXUS_AGENT_ID` for your Router. The example user service expects files below `%h/nexus`; adapt paths before installing.

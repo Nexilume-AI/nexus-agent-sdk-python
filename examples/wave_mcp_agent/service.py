@@ -13,7 +13,8 @@ import time
 import uuid
 from fair_queue import FairQueue
 
-IMAGE = os.environ.get('WAVE_IMAGE', 'nexus-wave-mcp:0b8c5fff11c9')
+IMAGE = os.environ.get('WAVE_IMAGE', 'nexus-wave-mcp:public-viewer-20261022')
+OPTIONAL_IMAGE = 'nexus-wave-mcp:public-viewer-20261022'
 VIEWER_TOOLS = {'open_wave_view','update_wave_view','get_view_state','list_wave_views','close_wave_view'}
 AUTH = {'workspace_id':{'type':'string','pattern':'^[0-9a-f]{32}$'}, 'workspace_key':{'type':'string','description':'Private workspace capability returned by create_wave_workspace.'}}
 
@@ -116,7 +117,7 @@ class Service:
         self.scheduler=FairQueue();self.creating=0;self.creating_by_caller={}
         probe=Worker()
         try:
-            self.original={t['name']:t for t in probe.rpc('tools/list')['tools'] if t['name'] not in VIEWER_TOOLS}
+            self.original={t['name']:t for t in probe.rpc('tools/list')['tools'] if not t['name'].startswith('_nexus_')}
         finally:probe.close()
         self.catalog=copy.deepcopy(LOCAL)
         for name,item in self.original.items():
@@ -127,6 +128,12 @@ class Service:
             short=doc.split('\n\n')[0].replace('\n',' ').strip()
             if len(short.encode())>330:short=short.encode()[:320].decode(errors='ignore')+'…'
             desc=short+' Requires workspace_id/key. File paths use /work. Call wave_tool_help for full instructions.'
+            if name in VIEWER_TOOLS:
+                desc={'open_wave_view':'Open one or two waveforms in a secure public browser viewer. Returns a one-use link valid 10 minutes; view expires after one hour. Requires workspace_id/key. No SSH tunnel. Files are private immutable copies.',
+                      'update_wave_view':'Update browser signals, cursor, viewport, markers or annotation through SSE. Requires workspace_id/key and view_id. The browser reloads the waveform with the new settings.',
+                      'get_view_state':'Get browser readiness and a fresh one-time public viewer link. Requires workspace_id/key and view_id. Each link opens one browser session; refreshing that browser remains valid.',
+                      'list_wave_views':'List your workspace public wave views with fresh one-time browser links. Requires workspace_id/key.',
+                      'close_wave_view':'Close a public wave view and revoke its browser access, or all_views=true for all workspace views. Requires workspace_id/key.'}[name]
             self.catalog.append({'name':name,'description':desc,'inputSchema':schema})
         threading.Thread(target=self.reap,daemon=True).start()
 
@@ -175,7 +182,13 @@ class Service:
     def _call(self,name,args,identity):
         if name=='get_wave_status':return result({'upstream':'Tencent/wave-mcp','version':'1.1.0','commit':'0b8c5fff11c9b4bf1e668787322ec41d08dd9d91',
             'tools':len(self.catalog),'transport':'Nexus Cloud MCP over OpenWrt Relay','waveforms':['FST','VCD'],'static_rtl':True,
-            'optional_unavailable':{'browser_viewer':'Viewer binaries are not installed; viewer tools are not advertised.','FSDB':'Requires a compatible Verdi FsdbReader runtime, not installed.'},
+            'optional_components':({'verible':'v0.0-4296-g0f262651 (CLI; RTL analysis uses pyslang)',
+                'viewer_assets':'Surfer 86eedfd0cda7, Wellen 0.25.6; authenticated public browser viewer',
+                'build_tools':['gcc','g++','make','patch','zlib headers'],
+                'fstdumper':'3c7506333d2c with Xcelium patch; simulator runtime not verified'} if IMAGE==OPTIONAL_IMAGE else {}),
+            'browser_viewer':{'public':True,'link_ttl_seconds':600,'view_ttl_seconds':3600,'updates':'SSE','files':'private immutable FST copies'},
+            'optional_unavailable':{
+                'FSDB':'Requires a compatible Verdi FsdbReader runtime (libnffr.so and libnsys.so), not installed.'},
             'workspace':{'storage':'temporary tmpfs','max_bytes':268435456,'idle_seconds':1800,'max_workers':4,'max_workers_per_caller':2,'network':'none',
                 'identity':'server-verified Key or account; same Key is one caller'},
             'scheduling':{'policy':'round-robin per caller; FIFO within caller','active_total':2,'active_per_caller':1,'pending_total':32,'pending_per_caller':8,'queue_timeout_seconds':10}})
@@ -209,6 +222,9 @@ class Service:
                 if self.workers.get(wid) is not worker:raise ValueError('WORKSPACE_NOT_FOUND_OR_EXPIRED')
             worker.last=time.monotonic()
             if name=='close_wave_workspace':
+                if getattr(worker,'public_views',None):
+                    from public_viewer import close_all
+                    close_all(worker)
                 with self.lock:self.workers.pop(wid,None)
                 worker.close();return result({'closed':True})
             if name=='read_wave_result':
@@ -219,5 +235,8 @@ class Service:
                 part=data[start:start+24576]
                 return result({'data_base64':base64.b64encode(part).decode(),'next_offset':start+len(part),'eof':start+len(part)>=len(data),'sha256':hashlib.sha256(data).hexdigest()})
             if name not in self.original:raise ValueError('Unknown tool.')
+            if name in VIEWER_TOOLS:
+                from public_viewer import call
+                return result(call(worker,name,args))
             return worker.bounded(worker.rpc('tools/call',{'name':name,'arguments':args}))
         finally:worker.last=time.monotonic();worker.lock.release()

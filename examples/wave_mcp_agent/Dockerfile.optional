@@ -1,0 +1,14 @@
+# Local deployment image only. Keep the pinned core image for rollback.
+# Context: prepared optional-build/ directory; see OPTIONALS.md.
+ARG BASE_IMAGE=nexus-wave-mcp:0b8c5fff11c9
+FROM ${BASE_IMAGE}
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ make patch zlib1g-dev libssl3 libfontconfig1 \
+    && rm -rf /var/lib/apt/lists/*
+COPY verible-v0.0-4296-g0f262651/bin/ /usr/local/bin/
+COPY assets/ /opt/wave-viewer/
+COPY fstdumper/fstdumper.so /opt/wave-optionals/fstdumper.so
+COPY fstdumper/LICENSE* /opt/wave-optionals/
+COPY VERIBLE-LICENSE /opt/wave-optionals/VERIBLE-LICENSE
+COPY PROVENANCE.json /opt/wave-optionals/PROVENANCE.json
+ENV WAVE_MCP_VIEWER_ASSETS=/opt/wave-viewer
