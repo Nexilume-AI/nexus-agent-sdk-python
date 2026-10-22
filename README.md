@@ -212,3 +212,10 @@ updates are required; existing `files.read` / `files.write` authorization applie
 In-memory APIs support up to 16 MiB; streaming APIs up to 1 GiB with bounded
 HTTPS chunks and SHA-256 verification before atomic replacement. No SSH or
 local Agent-host file fallback is used. See the [binary file guide](README_GUIDE.md#attached-computer-binary-files).
+
+## Native DRAM simulation example
+
+The [Ramulator MCP Agent](examples/ramulator_mcp_agent/README.md) demonstrates
+12 typed tools, caller-bound Docker workspaces, background simulation, fair
+request scheduling and checksum-verified artifact downloads through Relay.
+The native simulator and Docker are installed separately from the SDK.
