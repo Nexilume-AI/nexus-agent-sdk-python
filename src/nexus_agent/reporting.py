@@ -2918,6 +2918,23 @@ class NexusRunContext:
             )
         return urlopen(request, timeout=request_timeout)
 
+    def caller_identity(self) -> Dict[str, Any]:
+        """Read the verified caller from Cloud's authenticated runtime callback.
+
+        Bind workspaces to owner_scope and quotas to quota_scope. One API Key is
+        one caller across sessions; never substitute a tool argument or header.
+        Missing/old Cloud support fails closed instead of using a shared default.
+        """
+        value = self._load_run_context().get("caller_identity")
+        if (not isinstance(value, dict) or type(value.get("version")) is not int
+                or value["version"] != 1
+                or value.get("principal_type") not in ("api_key", "user", "service_account")
+                or any(not isinstance(value.get(key), str) or len(value[key]) != 64
+                       or any(c not in "0123456789abcdef" for c in value[key])
+                       for key in ("owner_scope", "quota_scope"))):
+            raise NexusRunContextUnavailable("Verified caller identity is unavailable")
+        return {key: value[key] for key in ("version", "principal_type", "owner_scope", "quota_scope")}
+
     def _load_run_context(self, *, limit: int = 200, refresh: bool = False) -> Dict[str, Any]:
         if self._run_context_cache is not None and not refresh:
             return dict(self._run_context_cache)

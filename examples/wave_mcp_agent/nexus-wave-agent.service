@@ -1,0 +1,17 @@
+[Unit]
+Description=Nexus Wave MCP Agent (isolated workspaces)
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/nexus/wave-agent
+Environment=PYTHONPATH=%h/nexus/sdk/src
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 %h/nexus/wave-agent/agent.py
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=90
+UMask=0077
+
+[Install]
+WantedBy=default.target
