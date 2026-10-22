@@ -1,0 +1,13 @@
+<style>
+body{margin:0;padding:32px;background:#102d3b;color:#e7f0f4;font:15px system-ui}h1{font-size:28px;letter-spacing:-.04em}p{color:#a3bcc9;line-height:1.7}button{background:#9bf0cf;color:#102d3b;border:0;border-radius:10px;padding:13px 18px;font:inherit;cursor:pointer}button:disabled{opacity:.5}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#173746;padding:20px;border-radius:12px;line-height:1.6}input{padding:10px;border:1px solid #537484;border-radius:8px;background:#173746;color:white;margin:6px}label{display:block;margin-top:14px;font-size:12px}#queries{font-size:44px;color:#9bf0cf}
+</style>
+<h1>Wave workspace</h1><p>A custom page, connected to your Agent through the Interactive View SDK.</p>
+<div id="queries">0</div><p>Completed queries</p><button id="refresh">List workspace files</button>
+<form id="query"><label>Session ID <input name="session_id" required></label><label>Signal path <input name="path" required></label><input name="start" value="0ns" aria-label="Start time"><input name="end" value="50ns" aria-label="End time"><button>Inspect signal</button></form>
+<p id="message"></p><pre id="output">Ready for your first query.</pre>
+<script>
+nexus.onState(state => {document.getElementById('queries').textContent=state.metrics?.[1]?.value ?? 0;document.getElementById('output').textContent=(state.logs || []).join('\n') || 'Ready for your first query.';});
+async function run(name,args,button){button.disabled=true;document.getElementById('message').textContent='Working…';try{await nexus.action(name,args);document.getElementById('message').textContent='Completed on Agent';}catch(e){document.getElementById('message').textContent=e.message;}finally{button.disabled=false;}}
+document.getElementById('refresh').onclick=e=>run('refresh',{},e.target);
+document.getElementById('query').onsubmit=e=>{e.preventDefault();run('query',Object.fromEntries(new FormData(e.target)),e.target.querySelector('button'));};
+</script>

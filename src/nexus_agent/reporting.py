@@ -2419,6 +2419,8 @@ class _AsyncRunContext:
         self.media = _AsyncMedia(context.media)
         from .files import AsyncRunFiles
         self.files = AsyncRunFiles(context.files)
+        from .interactive_views import AsyncInteractiveViews
+        self.views = AsyncInteractiveViews(context.views)
 
     async def raise_if_cancelled(self) -> None:
         await asyncio.to_thread(self._context.raise_if_cancelled)
@@ -2579,6 +2581,8 @@ class NexusRunContext:
         self.media = _MediaReporter(self)
         from .files import RunFiles
         self.files = RunFiles(self)
+        from .interactive_views import InteractiveViews
+        self.views = InteractiveViews(self)
         self.input = _RunInput(self)
         self.computer = _ComputerReporter(self)
         self.terminal = _TerminalReporter(self)

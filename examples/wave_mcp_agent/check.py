@@ -10,9 +10,9 @@ def main():
             res=service.call(name,args or {},{'version':1,'principal_type':'api_key','owner_scope':'a'*64,'quota_scope':'b'*64})
             assert bool(res.get('isError'))==error,(name,res)
             return res.get('structuredContent') or res
-        status=call('get_wave_status');assert status['tools']==45
+        status=call('get_wave_status');assert status['tools']==46
         w=call('create_wave_workspace',{'sample':True});auth={k:w[k] for k in ('workspace_id','workspace_key')}
-        print('PASS isolated workspace, 45 tools',flush=True)
+        print('PASS isolated workspace, 46 tools',flush=True)
         prep=call('prepare_session',{**auth,**w['sample']})
         print('PREP',json.dumps(prep)[:1800],flush=True)
         sid=prep.get('session_id')

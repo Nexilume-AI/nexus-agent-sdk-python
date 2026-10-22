@@ -94,8 +94,16 @@ scheduling, timeout, shutdown and cleanup tests.
 
 ## Public browser viewer
 
-The five viewer tools are enabled (45 total tools). Deploy matching Cloud viewer
+The five viewer tools are enabled (46 total tools, including the Interactive View dashboard). Deploy matching Cloud viewer
 routes, migration 0066, Redis and trusted Surfer WASM assets before enabling this
 bridge. See `PUBLIC_VIEWER.md` for the capability flow, limits and deployment.
+
+## Generic Interactive View SDK
+
+`open_wave_dashboard` returns a private page with file-list and signal-query actions.
+Choose `template="panel"` for built-in forms or `"custom"` for the sandboxed HTML
+example in `dashboard.html`. Actions run through the same caller-bound fair queue.
+`interactive_dashboard.py` uses only `current_run().views.create` and ordinary
+handlers: other Agents can follow the same pattern without Cloud-specific code.
 
 Set `NEXUS_TENANT` and `NEXUS_AGENT_ID` for your Router. The example user service expects files below `%h/nexus`; adapt paths before installing.

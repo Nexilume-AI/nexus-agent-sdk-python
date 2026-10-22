@@ -142,6 +142,9 @@ Run as your normal OS user. Wait for `connected`, then attach and authorize the 
 
 ## Documentation
 
+[Interactive View SDK](docs/interactive-views.md): create built-in panels or custom HTML/CSS/JavaScript pages, with authenticated actions back to your Agent.
+
+
 | Goal | Guide or example |
 | --- | --- |
 | Install wheels and choose extras | [Installation](README_GUIDE.md#install) |

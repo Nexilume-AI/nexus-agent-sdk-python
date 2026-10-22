@@ -17,7 +17,7 @@ Analyze RTL waveforms and SystemVerilog structure remotely through MCP. This com
 2. Call `prepare_session` with those workspace credentials, `wave_path: "/work/sample/dump.vcd"`, `filelist_path: "/work/sample/rtl.f"`, and `top: "top_tb"`. Save the returned `session_id`.
 3. Call `signal_values` with the workspace credentials, session ID and `paths: ["top_tb.u_counter.count"]`. Use `signal_drivers` for the same signal to inspect the RTL source.
 
-All 45 published tools have typed input schemas. `wave_tool_help` returns the complete original instructions for each upstream tool. File parameters refer to paths inside `/work`, not your local computer. Upload binary or text files as base64 in chunks of at most 1,024 decoded bytes; download them with `read_wave_file`. Large query results return a paging reference usable with `read_wave_result`.
+All 46 published tools have typed input schemas. `wave_tool_help` returns the complete original instructions for each upstream tool. File parameters refer to paths inside `/work`, not your local computer. Upload binary or text files as base64 in chunks of at most 1,024 decoded bytes; download them with `read_wave_file`. Large query results return a paging reference usable with `read_wave_result`.
 
 ## Open a waveform in your browser
 
@@ -36,3 +36,11 @@ Each workspace runs in its own non-root container, with no network, host mounts 
 FST, VCD conversion, static RTL analysis and remote file transfer are installed and tested. Verible CLI tools, build tools, Surfer viewer assets and the fstdumper plugin are installed in the worker image. The current RTL engine uses pyslang. The five viewer tools return authenticated public browser links; no SSH tunnel is needed. The fstdumper plugin requires a separately installed Xcelium simulator for simulation. FSDB conversion requires a compatible Verdi FsdbReader runtime, which is not installed on this deployment. The server analyzes existing waveforms; it does not run your simulator or an autonomous model.
 
 Free to connect through Nexus Marketplace; normal Nexus account quotas still apply. No upstream model API key is required. Source: Tencent/wave-mcp 1.1.0, pinned to `0b8c5fff11c9b4bf1e668787322ec41d08dd9d91`, Apache-2.0. This is a community integration, not an official Tencent hosted service.
+
+## Interactive workspace dashboard
+
+Call `open_wave_dashboard` with your workspace credentials to open a private panel.
+Use its forms to list files or query signals on the remote Agent; results arrive
+through SSE. Select `template="custom"` for the custom webpage example. These
+actions use the same caller isolation and fair queue as MCP calls. Browser links
+are single-use and expire after 10 minutes; sessions last at most one hour.

@@ -2,6 +2,7 @@
 
 from .reporting import NexusImageReference
 from .files import NexusFileError
+from .interactive_views import InteractiveViews, InteractiveView, InteractiveViewError
 from .inbox import NexusFollowUpUnavailable, RunInput
 
 from .agent import NexusAgent, NexusAgentHandle, PublishedCapability
@@ -146,6 +147,7 @@ from .workspace import (
 )
 
 __all__ = [
+    "InteractiveViews", "InteractiveView", "InteractiveViewError",
     "NexusFollowUpUnavailable",
     "RunInput",
     "NexusFileError",

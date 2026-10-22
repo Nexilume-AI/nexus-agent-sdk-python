@@ -75,6 +75,10 @@ class Worker:
             return message.get('result',{})
 
     def close(self):
+        for view in getattr(self, 'interactive_views', []):
+            try: view.close()
+            except Exception: pass  # Cloud TTL still bounds access after network loss.
+        self.interactive_views = []
         subprocess.run(['docker','rm','-f',self.name],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=20)
         try:self.process.wait(timeout=5)
         except subprocess.TimeoutExpired:self.process.kill()
@@ -97,6 +101,7 @@ def local_tool(name, description, properties=None, required=(), auth=True):
 
 
 LOCAL = [
+ local_tool('open_wave_dashboard','Open a private interactive dashboard. Browser actions run on this caller-bound workspace through the same fair queue. Choose a built-in panel or a sandboxed custom page. Returns a one-time public URL; expires in one hour.',{'template':{'type':'string','enum':['panel','custom'],'default':'panel'}}),
  local_tool('create_wave_workspace','Create a private Wave MCP workspace bound to your authenticated caller. The same API Key shares workspaces across MCP sessions. Save workspace_id/key. sample=true includes /work/sample counter VCD and RTL. Temporary 256 MiB storage expires after 30 minutes idle or restart. Download artifacts before closing. Limit 2 workspaces per caller, 4 total.',{'sample':{'type':'boolean','default':False}},auth=False),
  local_tool('get_wave_status','Show deployed upstream version, tool availability, isolation limits and optional dependencies. Does not list other users or workspaces.',auth=False),
  local_tool('close_wave_workspace','Permanently close this workspace and discard its in-memory files, sessions and paged results. Download required files before calling.'),
@@ -215,12 +220,16 @@ class Service:
             return result({'workspace_id':worker.id,'workspace_key':key,'root':'/work','idle_seconds':1800,'temporary':True,
                 'sample':{'wave_path':'/work/sample/dump.vcd','filelist_path':'/work/sample/rtl.f','top':'top_tb'} if args.get('sample') else None})
         worker=self.authorized_worker(args,identity)
+        auth={key:args[key] for key in ('workspace_id','workspace_key')}
         wid=args.pop('workspace_id');args.pop('workspace_key')
         if not worker.lock.acquire(blocking=False):raise ValueError('WORKSPACE_BUSY; one request per workspace at a time.')
         try:
             with self.lock:
                 if self.workers.get(wid) is not worker:raise ValueError('WORKSPACE_NOT_FOUND_OR_EXPIRED')
             worker.last=time.monotonic()
+            if name=='open_wave_dashboard':
+                from interactive_dashboard import open_dashboard
+                return result(open_dashboard(self,worker,auth,identity,args.get('template','panel')))
             if name=='close_wave_workspace':
                 if getattr(worker,'public_views',None):
                     from public_viewer import close_all

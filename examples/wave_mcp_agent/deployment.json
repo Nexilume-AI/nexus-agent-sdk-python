@@ -1,0 +1,34 @@
+{
+  "image": "nexus-wave-mcp:public-viewer-20261022",
+  "image_id": "sha256:46668ae81b169db120ae1d38d32433ddec4c404aa60e20bd36cdc9230fafafa9",
+  "upstream_commit": "0b8c5fff11c9b4bf1e668787322ec41d08dd9d91",
+  "agent_id": "1dbfb18c-3756-43b4-9e28-aa73ba2fec31",
+  "origin": "agent://eda/wave-11",
+  "service": "nexus-wave-agent.service",
+  "tools": 46,
+  "transport": "relay",
+  "rollback_image": "nexus-wave-mcp:0b8c5fff11c9-optionals-20261022",
+  "optional_components": [
+    "verible",
+    "surfer/surver",
+    "fstdumper",
+    "build-tools"
+  ],
+  "fsdb_runtime": false,
+  "public_browser_route": true,
+  "viewer": {
+    "link_ttl_seconds": 600,
+    "session_ttl_seconds": 3600,
+    "updates": "SSE",
+    "cloud_asset_path": "/opt/nexus-wave-viewer",
+    "cloud_migration": "0066_agent_wave_view"
+  },
+  "interactive_views": {
+    "cloud_migration": "0067_interactive_views",
+    "templates": [
+      "panel",
+      "custom"
+    ],
+    "actions": "outbound SSE, caller-bound fair queue"
+  }
+}
