@@ -37,6 +37,7 @@ from .models import (
     CapabilityRegistration,
     CloudRegistrationManifest,
     McpToolDescriptor,
+    CodexHook,
     NexusExecutionProfile,
     MOBILE_SCOPES,
     SseEvent,
@@ -1074,6 +1075,7 @@ class NexusMCPServer:
         slash_description: Optional[str] = None,
         execution_profiles: Optional[Sequence[NexusExecutionProfile]] = None,
         input_modalities: Optional[Sequence[str]] = None,
+        codex_hooks: Optional[Sequence[CodexHook]] = None,
         **options: Any,
     ) -> Any:
         """Register a FastMCP tool and its Nexus execution policy."""
@@ -1109,6 +1111,7 @@ class NexusMCPServer:
             slash_description=slash_description,
             execution_profiles=normalized_profiles,
             input_modalities=declared_modalities,
+            codex_hooks=tuple(codex_hooks or ()),
         )
 
         def register(candidate: Any) -> Any:
@@ -1138,6 +1141,8 @@ class NexusMCPServer:
                 policy["execution_profiles"] = [item.to_dict() for item in policy_descriptor.execution_profiles]
             if input_modalities is not None:
                 policy["input_modalities"] = list(policy_descriptor.input_modalities)
+            if policy_descriptor.codex_hooks:
+                policy["codex_hooks"] = policy_descriptor.to_dict(intent="", intent_version=1)["codex_hooks"]
             setattr(candidate, "__nexus_tool_policy__", policy)
             self._nexus_tool_policy[tool_name] = policy
             metadata = dict(options.pop("meta", {}) or {})

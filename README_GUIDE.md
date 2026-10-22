@@ -600,6 +600,20 @@ Public Internet IPv6 ingress, real upstream DHCPv6 and bare-metal Linux acceptan
 
 ## Explore the examples
 
+### Codex lifecycle hooks over MCP
+
+Use [the Codex Hook guide](examples/codex_hook_agent.md) and
+[device-free example Agent](examples/codex_hook_agent.py) to connect a deployed
+Nexus MCP tool to eleven Codex lifecycle events, including `PreToolUse`,
+`PostToolUse`, `UserPromptSubmit`, `Stop` and `Interrupt`. Agent authors declare
+events and argument mappings with `CodexHook` in the SDK. The Cloud MCP
+configuration generator's **Codex Hook** mode displays those declarations
+read-only so users can review and copy, without writing mappings themselves.
+The example needs no model key and does not read files or operate
+devices. Hooks require client-side review and trust; they are not a replacement
+for authorization or a reliable security boundary.
+`SessionEnd` does not support MCP hooks and is not generated.
+
 ### Native MCP on per-Agent IPv6 addresses
 
 The source SDK can serve a real FastMCP Streamable HTTP endpoint alongside the

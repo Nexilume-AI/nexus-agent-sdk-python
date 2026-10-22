@@ -5,6 +5,7 @@ import re
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
 from urllib.parse import urlsplit
+from .codex_hooks import normalize_codex_hooks
 
 
 _TLS_NAME = re.compile(
@@ -117,6 +118,24 @@ def _canonical_json(value: Any) -> bytes:
 
 
 @dataclass(frozen=True)
+class CodexHook:
+    """Author-owned event and argument mapping, copied unchanged by callers."""
+
+    event: str
+    input: Mapping[str, Any] = field(default_factory=dict)
+    matcher: Optional[str] = None
+    timeout: Optional[int] = None
+
+    def __post_init__(self) -> None:
+        normalize_codex_hooks([self.to_dict()], {})
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"event": self.event, "input": dict(self.input),
+                **({"matcher": self.matcher} if self.matcher is not None else {}),
+                **({"timeout": self.timeout} if self.timeout is not None else {})}
+
+
+@dataclass(frozen=True)
 class McpToolDescriptor:
     """Bounded MCP metadata published with one capability lease."""
 
@@ -136,6 +155,7 @@ class McpToolDescriptor:
     slash_description: Optional[str] = None
     execution_profiles: Tuple[NexusExecutionProfile, ...] = ()
     input_modalities: Tuple[str, ...] = ("text",)
+    codex_hooks: Tuple[CodexHook, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.name, str) or not _MCP_TOOL_NAME.fullmatch(self.name):
@@ -160,6 +180,11 @@ class McpToolDescriptor:
         if len(_canonical_json(schema)) >= 2048:
             raise ValueError("MCP input_schema must be smaller than 2048 UTF-8 bytes")
         object.__setattr__(self, "input_schema", schema)
+        hooks = tuple(self.codex_hooks)
+        if any(not isinstance(hook, CodexHook) for hook in hooks):
+            raise ValueError("codex_hooks must contain CodexHook values")
+        normalize_codex_hooks([hook.to_dict() for hook in hooks], schema)
+        object.__setattr__(self, "codex_hooks", hooks)
         if self.continuable and not (self.task or self.chat):
             raise ValueError("continuable MCP tools must also be tasks")
         if self.chat:
@@ -225,6 +250,9 @@ class McpToolDescriptor:
         }
         if self.mobile_scopes:
             value["mobile_scopes"] = list(self.mobile_scopes)
+        if self.codex_hooks:
+            value["codex_hooks"] = normalize_codex_hooks(
+                [hook.to_dict() for hook in self.codex_hooks], self.input_schema)
         if self.slash_command:
             value["slash_command"] = self.slash_command
             value["slash_description"] = self.slash_description or self.description or self.slash_command
