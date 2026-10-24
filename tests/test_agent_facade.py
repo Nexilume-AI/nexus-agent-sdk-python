@@ -384,6 +384,19 @@ class NexusAgentFacadeTest(unittest.TestCase):
             thread.join(timeout=2)
             agent.server.server_close()
 
+    def test_non_object_mcp_arguments_are_validation_error_not_handler_failure(self):
+        from nexus_agent.agent import _business_argument
+        from nexus_agent.server import AgentRequestError
+        for invalid in ([], "secret-input", 7, True):
+            envelope = SimpleNamespace(protocol="mcp", protocol_request={
+                "params": {"arguments": invalid}})
+            with self.subTest(type=type(invalid).__name__):
+                with self.assertRaises(AgentRequestError) as error:
+                    _business_argument(envelope, pass_envelope=False)
+                self.assertEqual(error.exception.status, 400)
+                self.assertEqual(error.exception.code, "INVALID_TOOL_ARGUMENTS")
+                self.assertNotIn("secret-input", error.exception.message)
+
     def test_explicit_cloud_tool_override_and_lan_only(self):
         agent = self._agent()
         descriptor = McpToolDescriptor(

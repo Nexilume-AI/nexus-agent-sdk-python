@@ -1,0 +1,7 @@
+models
+data
+*.tar.gz
+*.log
+__pycache__
+upstream/.git
+upstream/sampled_videos

@@ -1,0 +1,6 @@
+*
+!upstream/**
+!runner.py
+!ipc_client.py
+!evaluator_bridge.py
+!evaluate.py

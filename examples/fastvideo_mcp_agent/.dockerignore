@@ -1,0 +1,13 @@
+**
+!Dockerfile
+!Dockerfile.base
+!runner.py
+!benchmark.py
+!train.py
+!verify_weights.py
+!export.py
+!wan_dmd2.yaml
+!h3_*.py
+!probe_h3.py
+!upstream/
+!upstream/**

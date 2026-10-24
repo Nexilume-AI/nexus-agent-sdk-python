@@ -39,7 +39,7 @@ from .browser import (
     NexusBrowserPermissionRequired,
     NexusBrowserTunnelUnavailable,
 )
-from .direct_tasks import DirectTask, DirectTaskStore, TERMINAL_STATUSES
+from .direct_tasks import DirectTask, DirectTaskStore, DirectTaskCapacityError, TERMINAL_STATUSES
 from .models import (
     AgentEnvelope,
     AgentResponse,
@@ -701,7 +701,7 @@ class NexusAgentServer:
                 if direct_control is not None:
                     if cloud_context.enabled:
                         raise AgentRequestError(404, "NOT_FOUND", "task not found")
-                    self._handle_routed_direct_task_control(request, direct_control)
+                    self._handle_routed_direct_task_control(request, direct_control, envelope=envelope)
                     return
                 wants_stream = stream_endpoint or (
                     "text/event-stream" in
@@ -790,6 +790,9 @@ class NexusAgentServer:
             self._send_error(request, exc.status, exc.code, exc.message)
         except StreamResumeError as exc:
             self._send_error(request, exc.status, exc.code, exc.message)
+        except DirectTaskCapacityError:
+            self._send_error(request, 503, "DIRECT_TASK_CAPACITY_EXCEEDED",
+                "Direct Task capacity is full; existing tasks retain their expiry")
         except Exception as exc:
             code, message = _managed_service_error(exc)
             if code:
@@ -801,15 +804,42 @@ class NexusAgentServer:
         self,
         request: BaseHTTPRequestHandler,
         payload: Any,
+        *,
+        envelope: Optional[AgentEnvelope] = None,
     ) -> None:
         store = self._direct_tasks
         payload = payload if isinstance(payload, Mapping) else {}
+        action = str(payload.get("action") or "")
+        if action == "start":
+            if store is None or envelope is None:
+                raise AgentRequestError(404, "NOT_FOUND", "task admission unavailable")
+            if set(payload) != {"action", "payload"}:
+                raise AgentRequestError(400, "INVALID_TASK_ADMISSION", "invalid task admission")
+            with self._lock:
+                handler = self._handlers.get(envelope.intent)
+                stream_handler = self._stream_handlers.get(envelope.intent)
+            if handler is None and stream_handler is None:
+                raise AgentRequestError(404, "INTENT_NOT_SERVED", "intent is not served here")
+            # Preserve the authenticated identity and application envelope.
+            # The private receipt is transported in the JSON body because the
+            # gateway/peer IPC boundary does not retain task-control headers.
+            raw = dict(envelope.raw)
+            raw["payload"] = payload["payload"]
+            original = replace(envelope, payload=payload["payload"], raw=raw)
+            task = store.create()
+            self._start_direct_task(task, original, handler=handler,
+                stream_handler=stream_handler if handler is None else None,
+                interaction_mode="task")
+            self._send_json(request, 202, {"nexus_direct_task": {
+                "task_id": task.task_id, "task_token": task.token,
+                "status": task.status,
+            }})
+            return
         task_id = str(payload.get("direct_task_id") or "")
         token = str(payload.get("direct_task_token") or "")
         task = store.get(task_id, token) if store is not None else None
         if task is None:
             raise AgentRequestError(404, "NOT_FOUND", "task not found")
-        action = str(payload.get("action") or "")
         if action == "status":
             self._send_json(request, 200, task.public_status())
             return
@@ -1004,7 +1034,7 @@ class NexusAgentServer:
         request.end_headers()
         request.close_connection = True
         cursor = 0
-        total = 0
+
         try:
             while True:
                 events = task.wait_events(
@@ -1015,7 +1045,7 @@ class NexusAgentServer:
                     heartbeat = b": nexus-heartbeat\n\n"
                     request.wfile.write(heartbeat)
                     request.wfile.flush()
-                    total += len(heartbeat)
+
                 for item in events:
                     cursor = int(item["seq"])
                     raw = _sse_bytes(
@@ -1035,13 +1065,7 @@ class NexusAgentServer:
                             "SSE_EVENT_TOO_LARGE",
                             "SSE event exceeds server bounds",
                         )
-                    total += len(raw)
-                    if total > self.max_response_bytes:
-                        raise AgentRequestError(
-                            500,
-                            "STREAM_TOO_LARGE",
-                            "SSE response exceeds server bounds",
-                        )
+
                     request.wfile.write(raw)
                     request.wfile.flush()
                 if task.status in TERMINAL_STATUSES and cursor >= task.public_status()["last_seq"]:
@@ -1108,7 +1132,7 @@ class NexusAgentServer:
         request.send_header("Connection", "close")
         request.end_headers()
         request.close_connection = True
-        total = 0
+
         sequence = 0
         try:
             while True:
@@ -1120,23 +1144,23 @@ class NexusAgentServer:
                     heartbeat = b": nexus-heartbeat\n\n"
                     request.wfile.write(heartbeat)
                     request.wfile.flush()
-                    total += len(heartbeat)
+
                     continue
                 sequence += 1
+                # The Nexus SSE wire contract wraps the business value in
+                # `result`. A business object's own `result` field must remain
+                # nested rather than being mistaken for the transport envelope.
+                event_payload = {"result": data} if event_name == "result" else data
                 raw = _sse_bytes(SseEvent(
                     event=event_name,
                     event_id=str(sequence),
-                    data=json.dumps({"result": data} if event_name == "result" else data, separators=(",", ":"), ensure_ascii=False, default=_mcp_json_default),
+                    data=json.dumps(event_payload, separators=(",", ":"), ensure_ascii=False, default=_mcp_json_default),
                 ))
                 if len(raw) > self.max_stream_event_bytes:
                     raise AgentRequestError(
                         500, "SSE_EVENT_TOO_LARGE", "SSE event exceeds server bounds"
                     )
-                total += len(raw)
-                if total > self.max_response_bytes:
-                    raise AgentRequestError(
-                        500, "STREAM_TOO_LARGE", "SSE response exceeds server bounds"
-                    )
+
                 request.wfile.write(raw)
                 request.wfile.flush()
                 break
@@ -1189,7 +1213,7 @@ class NexusAgentServer:
         request.send_header("Connection", "close")
         request.end_headers()
         request.close_connection = True
-        total = 0
+
         try:
             sequence: Iterator[StreamItem]
             if first is None:
@@ -1203,15 +1227,12 @@ class NexusAgentServer:
                 raw = _sse_bytes(item)
                 if len(raw) > self.max_stream_event_bytes:
                     raise AgentRequestError(500, "SSE_EVENT_TOO_LARGE", "SSE event exceeds server bounds")
-                total += len(raw)
-                if total > self.max_response_bytes:
-                    raise AgentRequestError(500, "STREAM_TOO_LARGE", "SSE response exceeds server bounds")
+
                 request.wfile.write(raw)
                 request.wfile.flush()
             complete = b": nexus-stream-complete\n\n"
-            if total + len(complete) <= self.max_response_bytes:
-                request.wfile.write(complete)
-                request.wfile.flush()
+            request.wfile.write(complete)
+            request.wfile.flush()
         except (BrokenPipeError, ConnectionResetError):
             pass
         except Exception:

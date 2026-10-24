@@ -130,6 +130,22 @@ resource authorization and fair queue; view authorization does not bypass them.
 
 ## Deployment and Wave integration
 
+### Task consoles and cancellation
+
+A task tool does not need `chat=True` to publish an Interactive View. Mobilerun's
+`mobilerun_run` and `mobilerun_observe` create a custom HTML console while their
+durable MCP task runs. Call `mobilerun_console` to obtain a fresh single-use link;
+`view.set_state(...)` pushes progress, bounded screenshot previews and results.
+No separate application page or inbound Agent port is needed.
+
+In an explicit browser action handler, `view.cancel_task()` asks Cloud to cancel
+the durable task that created this view. It accepts no task ID, revokes that
+task's delegates and uses the normal cooperative cancellation protocol. It cannot
+cancel a different task. The runtime must continue checking `ctx.control()` /
+`ctx.raise_if_cancelled()` between operations. A view without a durable task
+returns an error. Use matching SDK and Cloud versions that implement this method.
+The async view exposes `await view.cancel_task()` as well.
+
 Apply `0067_interactive_views`, deploy `interactive_*`, `view_security.py`, updated
 Wave imports and callback routes, then restart the web service. Redis and the
 existing HTTPS public base URL are required. No new proxy or public runtime port.

@@ -108,7 +108,9 @@ class NexusDirectTask:
             "source_agent": str(source.get("source_agent") or ""),
             "tenant": str(source.get("tenant") or ""),
             "hop_limit": int(source.get("hop_limit") or 8),
-            "constraints": {},
+            # Peer OPEN validation needs the same bounded invocation contract
+            # as admission. Losing it makes otherwise valid controls fail.
+            "constraints": dict(source.get("constraints") or {}),
             "payload": {"nexus_direct_task_control": direct_control},
         }
         target = source.get("target_agent")
@@ -642,21 +644,30 @@ class NexusAgentClient:
         return self._post_json("/agent/v1/invoke", envelope)
 
     def invoke_async(self, envelope: Mapping[str, Any]) -> NexusDirectTask:
-        """Start a router-to-router Direct Task without blocking the caller."""
+        """Start a private Direct Task through direct HTTP or a routed gateway.
+
+        Admission uses the reserved control envelope: peer IPC transports JSON,
+        not arbitrary HTTP headers. Older servers reject this control without
+        executing the application, instead of silently running synchronously.
+        An ambiguous transport failure must not be automatically resubmitted.
+        """
 
         self._bind_envelope_identity(envelope)
-        payload, headers = self._request_json(
+        admission = dict(envelope)
+        admission["payload"] = {"nexus_direct_task_control": {
+            "action": "start", "payload": envelope.get("payload"),
+        }}
+        payload = self._request_json(
             "POST",
             "/agent/v1/invoke",
-            payload=envelope,
-            headers={"Prefer": "respond-async"},
-            return_headers=True,
+            payload=admission,
         )
-        normalized = {str(name).lower(): str(value) for name, value in headers.items()}
-        task_id = str(normalized.get("x-nexus-task-id") or payload.get("task_id") or "")
-        task_token = str(normalized.get("x-nexus-task-token") or "")
-        if not task_id or not task_token:
-            raise NexusDirectTaskError("Agent did not return Direct Task control headers")
+        control = payload.get("nexus_direct_task")
+        control = control if isinstance(control, Mapping) else {}
+        task_id = control.get("task_id")
+        task_token = control.get("task_token")
+        if not isinstance(task_id, str) or not task_id or not isinstance(task_token, str) or not task_token:
+            raise NexusDirectTaskError("Agent did not return a Direct Task admission receipt; execution is uncertain")
         return NexusDirectTask(self, task_id, task_token, dict(envelope))
 
     def invoke_interactive(

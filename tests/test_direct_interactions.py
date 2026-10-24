@@ -128,6 +128,85 @@ class DirectInteractionTest(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "cancelled"):
             task.result(timeout=1)
 
+    def test_async_task_survives_body_only_routing_with_bounded_controls(self):
+        """Model the installed peer boundary that discards HTTP metadata."""
+        entered = threading.Event()
+        release = threading.Event()
+        calls = []
+        forwarded = []
+
+        @self.server.handler("demo.routed-async")
+        def worker(request):
+            calls.append((request.task_id, request.payload, request.raw["payload"]))
+            entered.set()
+            release.wait(5)
+            return {"report": request.payload}
+
+        upstream = f"http://127.0.0.1:{self.server.port}/agent/v1/invoke"
+        class BodyOnly(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_POST(self):
+                body = self.rfile.read(int(self.headers["Content-Length"]))
+                value = json.loads(body)
+                forwarded.append(value)
+                if value.get("constraints", {}).get("max_latency_ms") != 30000:
+                    self.send_response(400)
+                    self.end_headers()
+                    return
+                request = urllib.request.Request(upstream, body, {"Content-Type": "application/json"})
+                try:
+                    response = urllib.request.urlopen(request, timeout=3)
+                except urllib.error.HTTPError as exc:
+                    response = exc
+                with response:
+                    result = response.read()
+                    self.send_response(response.status)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(result)))
+                    self.end_headers()
+                    self.wfile.write(result)
+
+        proxy = ThreadingHTTPServer(("127.0.0.1", 0), BodyOnly)
+        thread = threading.Thread(target=proxy.serve_forever, daemon=True)
+        thread.start()
+        try:
+            client = NexusAgentClient(f"http://127.0.0.1:{proxy.server_port}", auth="none", timeout=3, use_environment_proxy=False)
+            original = envelope("demo.routed-async")
+            original["constraints"] = {"max_latency_ms": 30000}
+            task = client.invoke_async(original)
+            self.assertTrue(entered.wait(1))
+            self.assertFalse(release.is_set())
+            self.assertEqual(task.status()["status"], "running")
+            self.assertNotIn(task._token, json.dumps(task.status()))
+            self.assertEqual(original["payload"], {"value": 7})
+            token = task._token
+            task._token = "wrong"
+            with self.assertRaises(Exception) as failure:
+                task.status()
+            self.assertEqual(getattr(failure.exception, "status", None), 404)
+            task._token = token
+            release.set()
+            self.assertEqual(task.result(timeout=3), {"report": {"value": 7}})
+            self.assertEqual(calls, [(original["task_id"], original["payload"], original["payload"])])
+            self.assertTrue(all(r["constraints"] == original["constraints"] for r in forwarded))
+        finally:
+            release.set()
+            proxy.shutdown()
+            proxy.server_close()
+            thread.join(timeout=2)
+
+    def test_unsupported_async_admission_never_runs_application(self):
+        """An old/disabled control implementation must fail before side effects."""
+        called = []
+        self.server.handler("demo.no-async")(lambda request: called.append(request.task_id))
+        with mock.patch.object(self.server, "_direct_tasks", None):
+            with self.assertRaises(Exception) as failure:
+                self.client.invoke_async(envelope("demo.no-async"))
+            self.assertEqual(getattr(failure.exception, "status", None), 404)
+        self.assertEqual(called, [])
+
 
 class RunContextExchangeTest(unittest.TestCase):
     def test_server_reports_missing_router_cloud_trust_explicitly(self):
@@ -265,7 +344,7 @@ class RunContextExchangeTest(unittest.TestCase):
             self.assertEqual(request.run_context.run_id, "cloud-stream-run")
             time.sleep(1.1)
             request.run_context.chat.say("durable final message")
-            return {"ok": True}
+            return {"ok": True, "result": {"artifact": "verified"}, "metrics": {"calls": 2}}
 
         server_thread = server.serve_in_thread()
         try:
@@ -287,7 +366,10 @@ class RunContextExchangeTest(unittest.TestCase):
                 raw = response.read().decode()
             self.assertIn(": nexus-heartbeat", raw)
             self.assertIn("event: result", raw)
-            self.assertIn('{"ok":true}', raw)
+            result_events = [block for block in raw.split("\n\n") if "event: result\n" in block]
+            self.assertEqual(len(result_events), 1)
+            wire = json.loads(next(line[6:] for line in result_events[0].splitlines() if line.startswith("data: ")))
+            self.assertEqual(wire, {"result": {"ok": True, "result": {"artifact": "verified"}, "metrics": {"calls": 2}}})
             self.assertEqual(
                 [item.get("type") for item in events],
                 ["TEXT_MESSAGE_START", "TEXT_MESSAGE_CONTENT", "TEXT_MESSAGE_END"],

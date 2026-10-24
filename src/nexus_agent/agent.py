@@ -231,7 +231,8 @@ def _business_argument(envelope: AgentEnvelope, *, pass_envelope: bool) -> Any:
     if arguments is None:
         return {}
     if not isinstance(arguments, Mapping):
-        raise AgentRequestError(400, "MCP tools/call arguments must be an object")
+        raise AgentRequestError(400, "INVALID_TOOL_ARGUMENTS",
+                                "MCP tools/call arguments must be an object")
     return dict(arguments)
 
 

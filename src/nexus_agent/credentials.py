@@ -13,7 +13,7 @@ class ProviderCredentials:
             raise RuntimeError('Provider authorization requires an HTTPS Cloud Run context.')
         return self.context._interaction_request('credentials/' + path, method=method, payload=payload)
 
-    def authorize(self, provider, wait_seconds=15, *, base_url=None, model=None, force_new=False):
+    def authorize(self, provider, wait_seconds=15, *, base_url=None, model=None, force_new=False, reuse_existing=False):
         """Request web approval, or return explicit MCP-config preauthorization.
 
         Always use the returned provider/base_url/model: caller configuration can
@@ -29,6 +29,10 @@ class ProviderCredentials:
         if model is not None:payload['model']=model
         if type(force_new) is not bool:raise ValueError('force_new must be a boolean')
         if force_new:payload['force_new']=True
+        if type(reuse_existing) is not bool:raise ValueError('reuse_existing must be a boolean')
+        # Opt in to the caller's latest active grant of the same protocol when
+        # no endpoint/model was specified. Cloud still enforces Agent/caller scope.
+        if reuse_existing:payload['reuse_existing']=True
         value = self._request('', 'POST', payload)
         deadline = time.monotonic() + wait_seconds
         while value.get('status') == 'pending' and time.monotonic() < deadline:

@@ -85,6 +85,14 @@ class InteractiveView:
                 except (OSError, ValueError):
                     raise InteractiveViewError('View update could not be delivered.') from None
 
+    def cancel_task(self):
+        """Request cancellation of this view's originating durable task only.
+
+        Call from an explicit user action handler. Cloud revokes task delegates;
+        the runtime must still observe its normal cooperative cancellation checks.
+        """
+        return self._request({'operation': 'cancel_task'})
+
     def start(self):
         """Start one outbound action stream; no inbound server or public port."""
         with self._lock:
@@ -210,6 +218,7 @@ class AsyncInteractiveView:
     def url(self): return self._view.url
     async def set_state(self, state): return await asyncio.to_thread(self._view.set_state, state)
     async def close(self): return await asyncio.to_thread(self._view.close)
+    async def cancel_task(self): return await asyncio.to_thread(self._view.cancel_task)
 
 
 class AsyncInteractiveViews:

@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import base64
 import codecs
+from contextvars import ContextVar
 from collections import deque
 from datetime import datetime, timezone
 import getpass
@@ -32,6 +33,21 @@ from urllib.request import HTTPRedirectHandler, HTTPSHandler, ProxyHandler, Requ
 import uuid
 
 
+def _decode_command_output(raw: bytes, maximum: int) -> str:
+    encoding = "utf-8"
+    try:
+        raw.decode(encoding)
+    except UnicodeDecodeError:
+        # Legacy Windows applications (including Windows PowerShell 5) may
+        # still write the system ANSI code page to redirected pipes.
+        if os.name == "nt":
+            encoding = "mbcs"
+    decoder = codecs.getincrementaldecoder(encoding)(errors="replace")
+    # A byte limit must not turn half of a valid character into replacement text.
+    return decoder.decode(raw[:maximum], final=len(raw) <= maximum)
+
+
+_command_roots: ContextVar[tuple[str, ...]] = ContextVar("nexus_command_roots", default=())
 PROTOCOL_VERSION = 1
 DEFAULT_ROOT = Path.home() / ".nexus" / "computer"
 CONFIG_NAME = "config.json"
@@ -984,6 +1000,7 @@ class NexusComputerRuntime:
             browser_available = False
         capabilities = {
             "workspace.v1": 1,
+            "workspace.select.v1": 1,
             "workspace.binary.v1": 1,
             "terminal.v1": 1,
             "terminal.stream.v1": 1,
@@ -1007,13 +1024,12 @@ class NexusComputerRuntime:
     def _resolved_root(self, requested: str = "") -> Path:
         configured = Path(str(self.config.get("workspace_root") or "~/.nexus")).expanduser().resolve()
         candidate = Path(str(requested)).expanduser().resolve() if requested else configured
-        try:
-            candidate.relative_to(configured)
-        except ValueError as exc:
+        roots = [configured, *(Path(value).expanduser().resolve() for value in _command_roots.get())]
+        if not any(candidate.is_relative_to(root) for root in roots):
             raise RuntimeOperationError(
                 "WORKSPACE_ROOT_MISMATCH",
                 "Command workspace is outside the paired Computer root",
-            ) from exc
+            )
         candidate.mkdir(parents=True, exist_ok=True)
         return candidate
 
@@ -1029,6 +1045,7 @@ class NexusComputerRuntime:
     def _verify_scope(self, operation: str, required_scope: str) -> None:
         expected = {
             "workspace.test": {"connection.list", "connection.test"},
+            "workspace.browse_directories": {"workspace.select"},
             "workspace.ensure_directory": {"files.write"},
             "workspace.list_files": {"files.list"},
             "workspace.read_file": {"files.read"},
@@ -1064,8 +1081,21 @@ class NexusComputerRuntime:
         payload: Mapping[str, Any],
         cancel_event: Optional[threading.Event] = None,
     ) -> dict[str, Any]:
+        # Only Cloud's signed command envelope supplies these per-command roots.
+        # ContextVar prevents concurrent commands/other registrations inheriting them.
+        roots = payload.get("_authorized_workspace_roots", [])
+        roots = tuple(item for item in roots if isinstance(item, str)) if isinstance(roots, list) else ()
+        token = _command_roots.set(roots)
+        try:
+            return self._dispatch(operation, required_scope, payload, cancel_event)
+        finally:
+            _command_roots.reset(token)
+
+    def _dispatch(self, operation, required_scope, payload, cancel_event=None):
         self._verify_scope(operation, required_scope)
         data = dict(payload)
+        if operation == "workspace.browse_directories":
+            return self._browse_device_directories(str(data.get("path") or ""))
         if operation == "workspace.test":
             capabilities, facts = self.detect_capabilities()
             root = self._resolved_root()
@@ -1082,6 +1112,38 @@ class NexusComputerRuntime:
         if operation.startswith("browser."):
             return self._browser(operation, data)
         raise RuntimeOperationError("COMPUTER_OPERATION_UNSUPPORTED", "Computer Runtime operation is not supported")
+
+    def _browse_device_directories(self, value: str) -> dict[str, Any]:
+        # Caller UI only: directory names, never file contents or implicit grants.
+        if len(value) > 4096 or "\0" in value:
+            raise RuntimeOperationError("WORKSPACE_PATH_INVALID", "Invalid folder path")
+        path = Path(value).expanduser() if value else Path.home()
+        if not path.is_absolute():
+            raise RuntimeOperationError("WORKSPACE_PATH_INVALID", "Choose an absolute folder path")
+        try:
+            path = path.resolve(strict=True)
+            if not path.is_dir():
+                raise NotADirectoryError()
+            directories = []
+            for item in path.iterdir():
+                try:
+                    if item.is_dir():
+                        directories.append({"name": item.name, "path": str(item.resolve())})
+                except OSError:
+                    continue
+                if len(directories) >= 1000:
+                    break
+            roots = [{"name": "Home", "path": str(Path.home())}]
+            if os.name == "nt":
+                import ctypes
+                mask = ctypes.windll.kernel32.GetLogicalDrives()
+                roots += [{"name": f"{chr(65+i)}:", "path": f"{chr(65+i)}:\\"} for i in range(26) if mask & (1 << i)]
+            else:
+                roots.append({"name": "/", "path": "/"})
+            return {"path": str(path), "parent": str(path.parent) if path.parent != path else None,
+                    "directories": sorted(directories, key=lambda item: item["name"].casefold()), "roots": roots}
+        except OSError:
+            raise RuntimeOperationError("WORKSPACE_NOT_ACCESSIBLE", "Folder does not exist or is not accessible") from None
 
     def _workspace(self, operation: str, data: dict[str, Any]) -> dict[str, Any]:
         if operation in {"workspace.transfer_read", "workspace.transfer_write"}:
@@ -1174,9 +1236,17 @@ class NexusComputerRuntime:
         command = str(data.get("command") or "")
         if not command or len(command.encode("utf-8")) > 65536:
             raise RuntimeOperationError("COMMAND_INVALID", "Command is empty or too large")
+        # Detached Windows services do not inherit the user's console code page.
+        # Keep cmd syntax, but agree on UTF-8 with console and Python children.
+        environment = os.environ.copy()
+        shell_command = command
+        if os.name == "nt":
+            shell_command = "chcp 65001 >nul & " + command
+            environment.update(PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
         process = subprocess.Popen(
-            command,
+            shell_command,
             cwd=str(cwd),
+            env=environment,
             shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -1207,8 +1277,8 @@ class NexusComputerRuntime:
                 break
             except subprocess.TimeoutExpired:
                 continue
-        stdout_text = bytes(stdout or b"")[:maximum].decode("utf-8", "replace")
-        stderr_text = bytes(stderr or b"")[:maximum].decode("utf-8", "replace")
+        stdout_text = _decode_command_output(bytes(stdout or b""), maximum)
+        stderr_text = _decode_command_output(bytes(stderr or b""), maximum)
         return {
             "cwd": str(cwd.relative_to(root)).replace("\\", "/") or ".",
             "command": command,

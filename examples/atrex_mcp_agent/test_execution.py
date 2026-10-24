@@ -64,6 +64,30 @@ class ExecutionTests(unittest.TestCase):
         gpu_probe=patch('broker.subprocess.run',return_value=Mock(returncode=0,stdout='0,0'))
         gpu_probe.start();self.addCleanup(gpu_probe.stop)
 
+    def test_expanded_token_budget_matches_catalog_and_preserves_bounds(self):
+        from service import catalog
+        tool = next(t for t in catalog() if t['name'] == 'start_atrex_optimization')
+        self.assertEqual(tool['inputSchema']['properties']['token_budget']['maximum'], 2000000)
+        job = self.broker.submit({**self.args, 'token_budget': 2000000})
+        self.assertEqual(job['spec']['token_budget'], 2000000)
+        self.assertEqual(job['spec']['max_model_requests'], 320)
+        for value in (2000001, 999, True):
+            with self.assertRaisesRegex(Failure, 'INVALID_ARGUMENT'):
+                self.broker.submit({**self.args, 'request_id': str(uuid.uuid4()), 'token_budget': value})
+
+    def test_expanded_budget_allows_request_81_but_enforces_new_cap(self):
+        job = self.broker.submit({**self.args, 'token_budget': 2000000})
+        live = self.broker.live[job['job_id']]
+        handler = Mock(headers={'Authorization': 'Bearer '+live['capability']}, path='/v1/responses')
+        self.broker.model_transport = Mock(side_effect=RuntimeError('transport reached'))
+        self.broker.update(job['job_id'], model_requests=80)
+        with self.assertRaisesRegex(RuntimeError, 'transport reached'):
+            self.broker.model(handler, {'model': 'gpt-6-sol'})
+        self.broker.update(job['job_id'], model_requests=320)
+        with self.assertRaisesRegex(Failure, 'MODEL_REQUEST_BUDGET_EXCEEDED'):
+            self.broker.model(handler, {'model': 'gpt-6-sol'})
+        self.assertEqual(self.broker.model_transport.call_count, 1)
+
     def test_idempotency_snapshot_and_no_persisted_secret(self):
         first = self.broker.submit(self.args)
         self.assertEqual(first, self.broker.submit(self.args))

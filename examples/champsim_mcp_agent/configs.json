@@ -1,0 +1,5 @@
+[
+  {"executable_name":"baseline","num_cores":1,"ooo_cpu":[{"branch_predictor":"bimodal"}],"L1D":{"prefetcher":"no"},"L2C":{"prefetcher":"no"},"LLC":{"replacement":"lru"}},
+  {"executable_name":"next-line","num_cores":1,"ooo_cpu":[{"branch_predictor":"bimodal"}],"L1D":{"prefetcher":"next_line"},"L2C":{"prefetcher":"no"},"LLC":{"replacement":"lru"}},
+  {"executable_name":"perceptron","num_cores":1,"ooo_cpu":[{"branch_predictor":"perceptron"}],"L1D":{"prefetcher":"no"},"L2C":{"prefetcher":"no"},"LLC":{"replacement":"lru"}}
+]

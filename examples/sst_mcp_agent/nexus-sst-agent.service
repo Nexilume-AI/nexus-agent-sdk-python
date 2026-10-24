@@ -1,0 +1,17 @@
+[Unit]
+Description=Nexus SST Core MCP Agent (isolated discrete-event simulations)
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/nexus-agents/sst-agent
+Environment=PYTHONPATH=/opt/nexus-agents/sdk/src
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/nexus-agents/sst-agent/agent.py
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=90
+UMask=0077
+
+[Install]
+WantedBy=default.target

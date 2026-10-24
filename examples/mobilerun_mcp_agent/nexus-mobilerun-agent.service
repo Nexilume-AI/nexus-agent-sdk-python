@@ -1,0 +1,16 @@
+[Unit]
+Description=Nexus Mobilerun caller-owned Mobile Agent
+After=network-online.target docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/nexus-agents/mobilerun-agent
+ExecStart=/usr/bin/docker run --rm --name nexus-mobilerun-agent --network host --read-only --cap-drop ALL --security-opt no-new-privileges --pids-limit 128 --memory 3g --cpus 2 --tmpfs /tmp:rw,nosuid,nodev,size=268435456,mode=1777 -v /opt/nexus-agents/mobilerun-agent/adapter:/opt/mobilerun:ro nexus-mobilerun:3b62bd767131
+ExecStop=/usr/bin/docker stop -t 20 nexus-mobilerun-agent
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+
+[Install]
+WantedBy=default.target

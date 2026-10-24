@@ -2,6 +2,7 @@
 !Dockerfile.worker
 !worker.py
 !bench_compat.py
+!manifest_compat.py
 !upstream/
 !upstream/**
 !bench/

@@ -285,6 +285,10 @@ class DirectTask:
             return self._assets.get(str(asset_id))
 
 
+class DirectTaskCapacityError(RuntimeError):
+    """Admission cannot proceed without discarding an unexpired task."""
+
+
 class DirectTaskStore:
     """Thread-safe bounded store shared by one NexusAgentServer."""
 
@@ -303,15 +307,15 @@ class DirectTaskStore:
         expired = [key for key, task in self._tasks.items() if task.expires_at <= now]
         for key in expired:
             self._tasks.pop(key, None)
-        while len(self._tasks) >= self.max_tasks:
-            key, task = next(iter(self._tasks.items()))
-            if task.status not in TERMINAL_STATUSES:
-                task.cancel()
-            self._tasks.pop(key, None)
 
     def create(self) -> DirectTask:
         with self._lock:
             self._prune()
+            if len(self._tasks) >= self.max_tasks:
+                # Reads and health checks must not destroy task identity.
+                # Completed results also retain their advertised TTL; apply
+                # backpressure to new admissions instead of evicting them.
+                raise DirectTaskCapacityError("Direct Task capacity is full")
             task = DirectTask(ttl_seconds=self.ttl_seconds)
             self._tasks[task.task_id] = task
             return task

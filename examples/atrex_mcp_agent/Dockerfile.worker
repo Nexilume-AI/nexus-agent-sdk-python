@@ -21,5 +21,7 @@ COPY bench_compat.py /opt/nexus-bench-compat.py
 RUN python3 /opt/nexus-bench-compat.py
 RUN ln -s /usr/bin/python3 /usr/local/bin/python && python --version
 COPY worker.py /opt/nexus-worker.py
+COPY manifest_compat.py /opt/atrex/nexus_manifest.py
+RUN python3 /opt/atrex/nexus_manifest.py
 ENV PATH=/usr/local/cuda/bin:/usr/local/bin:/usr/bin:/bin LD_LIBRARY_PATH=/driver:/usr/local/cuda/lib64 PYTHONPATH=/opt/atrex-bench/src
 ENTRYPOINT ["python3", "-u", "/opt/nexus-worker.py"]

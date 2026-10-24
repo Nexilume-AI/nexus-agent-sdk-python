@@ -104,6 +104,9 @@ def main():
                           ATREX_CLAUDE_SESSION_SETTINGS=json.dumps({'model': spec['model']}))
     else:
         agent_cli = 'codex'
+        # Long-horizon sessions use this persistent home directly; unlike the
+        # baseline's temporary home, Codex requires it to exist before startup.
+        (work / 'home' / '.codex').mkdir(mode=0o700, parents=True, exist_ok=True)
         os.environ.update(OPENAI_API_KEY='job-proxy', CODEX_HOME='/work/home/.codex',
             ATREX_CODEX_SESSION_SETTINGS=json.dumps({
                 'model': spec['model'], 'model_reasoning_effort': 'high',
@@ -141,7 +144,7 @@ def main():
             '--agent-cli', agent_cli, '--workspace', '/work/output', '--optimization-mode', 'production',
             '--max-iters', str(spec['max_iters']), '--token-budget', str(spec['token_budget']),
             '--fast-episodes', str(spec['max_iters']),
-            '--notes', 'Assigned GPU is Pascal compute capability 6.0. Use CUDA compatible with sm_60. Triton and Nsight Compute hardware counters are unavailable. Use evaluator correctness and CUDA event timing; never claim hardware-counter measurements.',
+            '--notes', 'Assigned GPU is Pascal compute capability 6.0. Use CUDA compatible with sm_60. Triton and Nsight Compute hardware counters are unavailable. Use evaluator correctness and CUDA event timing; never claim hardware-counter measurements. Declare all directly used native libraries in solution.json dependencies and dependency_roles: NVRTC (nvrtc) when compiling with nvrtcCompileProgram, and CUDA Driver (cuda-driver) when launching with cuLaunchKernel; ctypes alone is not their declaration. Keep the manifest accurate when changing the loader. Investigate both GPU memory access and host launch overhead; a float4-only trial previously remained slower than the reference. Any claimed speedup must be measured, not inferred.',
             '--fast-trials', '1', '--setup-timeout', str(spec['timeout_seconds']),
             '--sandbox-timeout', '600']
         print(json.dumps({'event':'optimizer_started', 'framework': spec['framework'], 'model': spec['model']}), flush=True)

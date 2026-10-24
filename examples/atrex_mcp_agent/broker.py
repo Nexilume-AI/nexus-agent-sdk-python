@@ -168,8 +168,9 @@ class Broker:
         if args.get('framework', 'CUDA') != 'CUDA': raise Failure('FRAMEWORK_UNSUPPORTED_ON_GPU')
         spec = {'provider': provider, 'base_url':credentials['base_url'], 'protocol':'anthropic' if provider in ('anthropic','custom_anthropic') else 'openai', 'model': model, 'framework': 'CUDA', 'platform': 'NVIDIA-Pascal',
                 'max_iters': bounded_int(args.get('max_iters', 1), 1, 20),
-                'token_budget': bounded_int(args.get('token_budget', 50000), 1000, 500000),
+                'token_budget': bounded_int(args.get('token_budget', 50000), 1000, 2000000),
                 'timeout_seconds': bounded_int(args.get('timeout_seconds', 1800), 60, 3300)}
+        spec['max_model_requests'] = max(80, min(320, (spec['token_budget'] + 6249) // 6250))
         grant = self.grant_status(credentials)
         authorization_id = str(uuid.UUID(args['authorization_id']))
         if grant['authorization_id'] != authorization_id: raise Failure('AUTHORIZATION_MISMATCH')
@@ -265,11 +266,11 @@ class Broker:
         log_process=None;log_thread=None
         try:
             args = ['run','-d','--name',name,'--label','nexus.atrex.job='+jid,
-                '--network','none','--read-only','--user','1000:1000','--cap-drop','ALL',
+                '--network','none','--read-only','--user','1006:1008','--cap-drop','ALL',
                 '--security-opt','no-new-privileges','--pids-limit','512','--memory','12g','--cpus','4',
                 '--ulimit','fsize=67108864:67108864','--shm-size','512m',
                 '--tmpfs','/tmp:rw,exec,nosuid,nodev,size=1g,mode=1777',
-                '--tmpfs','/work:rw,exec,nosuid,nodev,size=8g,uid=1000,gid=1000,mode=0700',
+                '--tmpfs','/work:rw,exec,nosuid,nodev,size=8g,uid=1006,gid=1008,mode=0700',
                 '--mount','type=bind,src='+str(directory/'input')+',dst=/input,readonly',
                 '--mount','type=bind,src='+str(self.root/'proxy')+',dst=/model,readonly',
                 '--device',f'/dev/nvidia{self.gpu}', '--device','/dev/nvidiactl','--device','/dev/nvidia-uvm',
@@ -405,7 +406,8 @@ class Broker:
                     if isinstance(item,dict) and item.get('type')=='additional_tools':
                         check_client_tools(item.get('tools'))
             if handler.path not in MODEL_PATHS:raise Failure('MODEL_ENDPOINT_NOT_ALLOWED')
-            if record['model_requests']>=80:raise Failure('MODEL_REQUEST_BUDGET_EXCEEDED')
+            if record['model_requests'] >= spec.get('max_model_requests', 80):
+                raise Failure('MODEL_REQUEST_BUDGET_EXCEEDED')
             anthropic=spec['protocol']=='anthropic'
             if anthropic and handler.path!='/v1/messages':raise Failure('MODEL_ENDPOINT_NOT_ALLOWED')
             if not anthropic and handler.path=='/v1/messages':raise Failure('MODEL_ENDPOINT_NOT_ALLOWED')

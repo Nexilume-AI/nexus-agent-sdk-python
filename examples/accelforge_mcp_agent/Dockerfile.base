@@ -1,0 +1,8 @@
+FROM nexus-ramulator-mcp:c6c7a5de0cef
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends python3-venv graphviz libgmp-dev libntl-dev autoconf automake libtool pkg-config && rm -rf /var/lib/apt/lists/*
+RUN python3 -m venv /opt/venv
+ENV PATH=/opt/venv/bin:$PATH PYTHONPATH=/opt/accelforge PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+COPY upstream /opt/accelforge
+RUN pip install --no-cache-dir /opt/accelforge pytest && pip check
+WORKDIR /opt/accelforge

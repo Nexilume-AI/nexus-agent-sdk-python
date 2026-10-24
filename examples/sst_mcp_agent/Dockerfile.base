@@ -1,0 +1,13 @@
+FROM nexus-ramulator-mcp:c6c7a5de0cef
+USER root
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends autoconf automake libtool libtool-bin openmpi-bin libopenmpi-dev zlib1g-dev python3-dev && rm -rf /var/lib/apt/lists/*
+COPY upstream /build/core
+WORKDIR /build/core
+RUN ./autogen.sh && ./configure --prefix=/opt/sst && make -j8 && make install
+ENV PATH=/opt/sst/bin:$PATH
+COPY elements /build/elements
+WORKDIR /build/elements
+RUN for d in src/sst/elements/*; do if [ -d "$d" ]; then case "$(basename "$d")" in simpleElementExample|simpleSimulation|memHierarchy|miranda|merlin|cassini) ;; *) touch "$d/.ignore"; rm -f "$d/.unignore";; esac; fi; done && ./autogen.sh && ./configure --prefix=/opt/sst --with-sst-core=/opt/sst && make -j8 && make install
+RUN sst --version && sst-info > /opt/sst/components.txt
+ENV HOME=/tmp USER=nexus LOGNAME=nexus PYTHONUNBUFFERED=1
+WORKDIR /work

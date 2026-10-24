@@ -1,0 +1,17 @@
+[Unit]
+Description=Nexus Pi Coding Agent
+After=network-online.target docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/nexus-agents/pi-agent
+Environment=PYTHONPATH=/opt/nexus-agents/sdk/src
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/nexus-agents/pi-agent/agent.py
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+
+[Install]
+WantedBy=default.target

@@ -1,7 +1,7 @@
 include LICENSE LICENSING.md CONTRIBUTOR_LICENSE_AGREEMENT.md README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md RELEASING.md
 include README_PYPI.md
 include install-linux.sh
-recursive-include examples *.py *.md *.txt Dockerfile
+recursive-include examples *.py *.md *.txt *.html *.mjs *.js *.json *.yaml *.yml *.toml *.sh *.service *.lock *.commit *.png Dockerfile Dockerfile.* .dockerignore
 recursive-include deploy *.example *.service *.sysusers *.ps1
 recursive-include tests *.py
 recursive-include scripts *.py

@@ -41,9 +41,7 @@ def test_hosted_declaration_never_discovers_authenticates_or_listens():
 
 def test_trusted_boot_selects_hosted_before_importing_unmodified_native_source():
     source = Path(__file__).parents[1] / "examples" / "dual_runtime_agent.py"
-    boot = Path(os.environ.get("NEXUS_SERVER_SOURCE", "__server_source_not_configured__")) / "apps" / "agents" / "python_profile" / "nexus_boot.py"
-    if not boot.is_file():
-        pytest.skip("Requires the separate Nexus Server source checkout")
+    boot = Path(__file__).resolve().parents[4] / "nexus_server" / "apps" / "agents" / "python_profile" / "nexus_boot.py"
     spec = importlib.util.spec_from_file_location("test_nexus_boot", boot)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

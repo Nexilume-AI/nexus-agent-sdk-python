@@ -1,0 +1,10 @@
+FROM nexus-sst-base:16.0.0
+ENV DEBIAN_FRONTEND=noninteractive PIP_DISABLE_PIP_VERSION_CHECK=1 UV_HTTP_TIMEOUT=180 UV_LINK_MODE=copy
+RUN apt-get update && apt-get install -y --no-install-recommends python3-venv ca-certificates ffmpeg libgl1 libglib2.0-0 && rm -rf /var/lib/apt/lists/*
+RUN python3 -m venv /opt/fastvideo-env && /opt/fastvideo-env/bin/pip install --no-cache-dir uv
+ENV PATH=/opt/fastvideo-env/bin:$PATH
+COPY upstream /opt/fastvideo
+RUN UV_TORCH_BACKEND=cu126 uv pip install --python /opt/fastvideo-env/bin/python /opt/fastvideo
+RUN python -m pip check
+ENV FASTVIDEO_ATTENTION_BACKEND=TORCH_SDPA FASTVIDEO_DISABLE_COMPILE=1 HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 DO_NOT_TRACK=1
+WORKDIR /work

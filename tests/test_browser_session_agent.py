@@ -119,9 +119,7 @@ class AttachedBrowserAgentExampleTests(unittest.TestCase):
         except ImportError:
             self.skipTest("Optional FastMCP dependency is not installed")
         from nexus_agent import NexusRunContext
-        boot = Path(os.environ.get("NEXUS_SERVER_SOURCE", "__server_source_not_configured__")) / "apps" / "agents" / "python_profile" / "nexus_boot.py"
-        if not boot.is_file():
-            self.skipTest("Requires the separate Nexus Server source checkout")
+        boot = EXAMPLE.resolve().parents[4] / "nexus_server" / "apps" / "agents" / "python_profile" / "nexus_boot.py"
         spec = importlib.util.spec_from_file_location("browser_upload_boot", boot)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
