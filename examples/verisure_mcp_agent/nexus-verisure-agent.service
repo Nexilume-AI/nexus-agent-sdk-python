@@ -1,0 +1,16 @@
+[Unit]
+Description=Nexus Veri-Sure RTL MCP
+After=network-online.target
+
+[Service]
+WorkingDirectory=/opt/nexus-agents/verisure-agent
+Environment=PYTHONPATH=/opt/nexus-agents/sdk/src
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/nexus-agents/verisure-agent/agent.py
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=60
+UMask=0077
+
+[Install]
+WantedBy=default.target

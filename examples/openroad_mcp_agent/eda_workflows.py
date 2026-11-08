@@ -25,8 +25,8 @@ def tool(name, description, properties, required=()):
 
 TOOLS = [
     tool('list_eda_platforms', 'List installed ORFS platforms and bundled design configurations. Presence does not guarantee that all optional PDK files or tools are installed.', {}),
-    tool('create_eda_project', 'Create a project with a random ID and separate directory. Choose a bundled design, or provide top for your own RTL and upload .v/.sv/.vh/.sdc files. Keep project_id; projects are not globally listed.',
-         {'platform': TEXT, 'design': TEXT, 'top': TEXT}, ['platform']),
+    tool('create_eda_project', 'Create a project with a random ID and separate directory. For custom RTL provide platform and top, omitting design. For a bundled design provide platform and design, omitting top. Empty optional selectors are treated as omitted. Optional physical_profile selects an operator-installed, hash-pinned macro/PDN configuration for custom RTL; it cannot upload or execute caller-supplied profile scripts. Upload .v/.sv/.vh/.sdc before running. Keep project_id; projects are not globally listed.',
+         {'platform': TEXT, 'design': TEXT, 'top': TEXT, 'physical_profile': TEXT}, ['platform']),
     tool('upload_eda_file', 'Upload an input file as base64 chunks (max 48 KiB decoded). Use offset=0 first, then next_offset. Identical chunk retries are safe; conflicting bytes are rejected. Supply sha256 on the final chunk to verify the complete file. Upload before submitting a job.',
          {'project_id': ID, 'path': TEXT, 'offset': OFFSET, 'data_base64': TEXT, 'sha256': TEXT}, ['project_id', 'path', 'data_base64']),
     tool('run_eda_flow', 'Start an asynchronous, isolated RTL-to-GDS ORFS flow. Returns job_id immediately. request_id is a caller-generated retry key: reuse it only for the same request. Inputs are snapshotted. Poll get_eda_job; use list_eda_artifacts and read_eda_artifact when terminal. One flow runs at a time.',
@@ -108,8 +108,41 @@ class EdaWorkflows:
                             for p in sorted((self.flow/'designs').iterdir())
                             if p.is_dir() and (self.flow/'platforms'/p.name/'config.mk').is_file()]}
 
-    def create_eda_project(self, platform, design=None, top=None):
+    def _physical_profile(self, name, platform, top):
+        """Profiles are installed by the operator, outside all caller input trees."""
+        name=safe_name(name)
+        base=self.root/'physical_profiles'
+        directory=base/name
+        manifest=directory/'manifest.json'
+        if any(p.is_symlink() for p in (base,directory,manifest)) or not manifest.is_file():
+            raise ValueError('Physical profile is not installed')
+        value=json.loads(manifest.read_text())
+        if value.get('platform')!=platform or (value.get('top') and value['top']!=top):
+            raise ValueError('Physical profile platform/top mismatch')
+        files=value.get('files')
+        if not isinstance(files,dict) or not files or len(files)>100 or 'config.mk' not in files:
+            raise ValueError('Invalid physical profile manifest')
+        total=0
+        for filename,sha256 in files.items():
+            if not isinstance(filename,str) or not re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]{0,159}',filename):
+                raise ValueError('Unsafe physical profile filename')
+            if not isinstance(sha256,str) or not re.fullmatch('[0-9a-f]{64}',sha256):
+                raise ValueError('Invalid physical profile hash')
+            source=directory/filename
+            if source.is_symlink() or not source.is_file() or digest(source)!=sha256:
+                raise ValueError('Physical profile content changed; operator verification required')
+            total+=source.stat().st_size
+        if total>256*1024**2: raise ValueError('Physical profile exceeds snapshot limit')
+        return directory,value,digest(manifest)
+
+    def create_eda_project(self, platform, design=None, top=None, physical_profile=None):
         platform=safe_name(platform)
+        # Some compatible tool callers serialize unused optional selectors as
+        # empty strings. Only these selectors treat blank as absent; do not
+        # relax identifier/path validation or coerce other false-like values.
+        if isinstance(design,str) and not design.strip(): design=None
+        if isinstance(top,str) and not top.strip(): top=None
+        if isinstance(physical_profile,str) and not physical_profile.strip(): physical_profile=None
         if not (self.flow/'platforms'/platform/'config.mk').is_file(): raise ValueError('Platform is not installed')
         if (design is None)==(top is None): raise ValueError('Specify exactly one of design (bundled) or top (custom RTL)')
         if design is not None:
@@ -117,11 +150,17 @@ class EdaWorkflows:
             if not (self.flow/'designs'/platform/design/'config.mk').is_file(): raise ValueError('Bundled design not found')
         else:
             if not isinstance(top,str) or not re.fullmatch('[A-Za-z_][A-Za-z0-9_]{0,79}',top): raise ValueError('Invalid Verilog top name')
+        profile_hash=None
+        if physical_profile is not None:
+            if design is not None: raise ValueError('Physical profiles require a custom RTL top')
+            _,_,profile_hash=self._physical_profile(physical_profile,platform,top)
         if len(list((self.root/'projects').iterdir()))>=100: raise ValueError('Project quota reached; operator cleanup required')
         pid=uuid.uuid4().hex
         directory=self.root/'projects'/pid
         (directory/'inputs').mkdir(parents=True,mode=0o700)
         data={'project_id':pid,'platform':platform,'design':design,'top':top,'created_at':time.time()}
+        if physical_profile is not None:
+            data.update(physical_profile=physical_profile,physical_profile_sha256=profile_hash)
         dump(directory/'project.json',data)
         return data
 
@@ -168,6 +207,12 @@ class EdaWorkflows:
             raise ValueError('EDA worker is busy; wait for the active job to finish')
         if len(list((self.root/'jobs').iterdir()))>=50 or shutil.disk_usage(self.root).free<5*1024**3: raise ValueError('Job storage quota reached; operator cleanup required')
         spec=json.loads((project/'project.json').read_text())
+        profile=None
+        if spec.get('physical_profile'):
+            source,value,profile_hash=self._physical_profile(spec['physical_profile'],spec['platform'],spec['top'])
+            if profile_hash!=spec['physical_profile_sha256']:
+                raise ValueError('Physical profile revision changed; create a new project')
+            profile=(source,value,profile_hash)
         if any(p.is_symlink() for p in (project/'inputs').rglob('*')): raise ValueError('Symlink inputs are not allowed')
         if not spec['design']:
             if not list((project/'inputs').rglob('*.v')) and not list((project/'inputs').rglob('*.sv')): raise ValueError('Upload RTL files before running')
@@ -175,6 +220,14 @@ class EdaWorkflows:
         jid=uuid.uuid4().hex;directory=self.root/'jobs'/jid
         directory.mkdir(mode=0o700)
         shutil.copytree(project/'inputs',directory/'inputs',symlinks=False)
+        if profile:
+            source,value,profile_hash=profile
+            snapshot=directory/'profile';snapshot.mkdir(mode=0o700)
+            for name,sha256 in value['files'].items():
+                shutil.copyfile(source/name,snapshot/name,follow_symlinks=False)
+                if (snapshot/name).is_symlink() or digest(snapshot/name)!=sha256:
+                    raise ValueError('Physical profile changed while snapshotting')
+            dump(snapshot/'manifest.json',value)
         if spec['design']:
             config='include '+str(self.flow/'designs'/spec['platform']/spec['design']/'config.mk')+'\n'
         else:
@@ -185,6 +238,8 @@ class EdaWorkflows:
             config+='export VERILOG_INCLUDE_DIRS = '+' '.join(sorted({str(p.parent) for p in (directory/'inputs').rglob('*') if p.is_file()}))+'\n'
             config+=f'export SDC_FILE = {sdc}\nexport CORE_UTILIZATION = 40\nexport PLACE_DENSITY_LB_ADDON = 0.20\n'
             if spec['platform']=='nangate45': config+=f'export PDN_TCL = {self.flow}/designs/nangate45/gcd/grid_strategy-M1-M4-M7.tcl\n'
+            if profile:
+                config+=f'export NEXUS_PROFILE_DIR = {directory}/profile\ninclude {directory}/profile/config.mk\n'
         (directory/'config.mk').write_text(config)
         state={'job_id':jid,'request':request,'project':spec,'status':'queued','created_at':time.time(),'completed_stages':[],
                'stages':STAGES[:STAGES.index(through)+1],'current_stage':None,'artifacts_ready':False}
@@ -268,7 +323,7 @@ class EdaWorkflows:
 
     def _artifacts(self,directory):
         paths=[]
-        for name in ('inputs','work/results','work/reports','work/logs'):
+        for name in ('inputs','profile','work/results','work/reports','work/logs'):
             for path in sorted((directory/name).rglob('*')):
                 if path.is_file() and not any(p.is_symlink() for p in [path,*path.parents]) and path.resolve().is_relative_to(directory):paths.append(path)
         for name in ('flow.log','config.mk'):

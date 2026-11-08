@@ -98,3 +98,19 @@ artifacts separately.
 
 See [Agent training data](../../docs/agent-training-data.md) for explicit client
 trajectory collection. MCP tool logs alone do not contain a complete conversation.
+
+### Optional selectors and physical profiles
+
+For `create_eda_project`, select either a bundled `design` or a custom RTL `top`.
+Empty or whitespace-only optional selectors are treated as omitted; identifiers,
+mutual exclusion and path checks still apply. Veri-Sure likewise defaults empty
+`top` and `rtl_path` to `tb` and `rtl.sv`.
+
+A custom RTL project may select `physical_profile`. An operator must first install
+`physical_profiles/<name>/manifest.json` under the EDA service root. The manifest
+contains `platform`, optional `top`, and a `files` mapping of flat filenames to
+SHA256 values, including `config.mk`. Referenced macro/PDN files are snapshotted
+with the job and listed as artifacts. The limit is 100 files / 256 MiB. Symlinks,
+invalid filenames, changed hashes and mismatched platforms/tops are rejected.
+Profiles are trusted operator configuration: callers may select an installed
+profile, but cannot upload profile Make/Tcl scripts through this interface.
