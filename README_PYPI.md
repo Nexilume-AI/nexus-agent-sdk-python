@@ -13,8 +13,8 @@ Use a virtual environment. The dependency-free core supports Python 3.9+;
 Python 3.12 is recommended for optional integrations.
 
 ```sh
-python -m pip install nexilume==0.51.1
-python -m pip install "nexilume[fastmcp]==0.51.1"
+python -m pip install nexilume==0.52.1
+python -m pip install "nexilume[fastmcp]==0.52.1"
 ```
 
 Use `python -m pip install --upgrade nexilume` to upgrade the core SDK.
@@ -49,7 +49,7 @@ Nexus installation. OpenWrt LAN registration is a separate supported mode.
 ## Computer Runtime
 
 ```sh
-python -m pip install "nexilume[computer,browser]==0.51.1"
+python -m pip install "nexilume[computer,browser]==0.52.1"
 nexus-computer setup "<pairing-url-from-your-cloud>"
 nexus-computer status
 ```
@@ -141,3 +141,13 @@ third-party licenses remain unchanged. New contributions require the explicit
 contributor agreement included in the source distribution.
 
 Commercial licensing: **cary.nexilume@outlook.com**.
+
+## Relay model registration (0.52.1+)
+
+`pip install -U nexilume` also installs `nexus-relay`. On Linux/OpenWrt, use
+`nexus-relay login` for browser-confirmed device authorization, then
+`nexus-relay model register MODEL` to register an approved model endpoint.
+Credentials and registration records are managed automatically. See the
+[Relay guide](https://github.com/Nexilume-AI/nexus-agent-sdk-python/blob/main/docs/relay-models.md)
+for endpoint-key import, refresh, revocation and headless login. No `nexus_cli`
+dependency is required.
