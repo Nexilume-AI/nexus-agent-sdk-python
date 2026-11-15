@@ -767,3 +767,7 @@ The Apache License 2.0 (modified) applies to this SDK. Third-party dependencies 
 ### Licensing conditions
 
 Nexus is licensed under a modified version of the Apache License 2.0, with the following additional conditions. Multi-tenant service operation and removal of existing Nexus UI branding require prior written authorization. Earlier Apache-2.0 grants and third-party licenses remain unchanged. Contributions require explicit agreement permitting commercial use and future relicensing. See [LICENSING.md](LICENSING.md). Authorization contact: **cary.nexilume@outlook.com**.
+
+## Relay models
+
+[Device login, registration and CLI](docs/relay-models.md) (SDK 0.52.1+).

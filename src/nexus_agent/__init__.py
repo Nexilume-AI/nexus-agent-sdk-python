@@ -1,5 +1,7 @@
 """Nexus OpenWrt Agent SDK."""
 
+from .relay_models import RelayModelClient, RelayModelError
+
 from .reporting import NexusImageReference
 from .files import NexusFileError
 from .interactive_views import InteractiveViews, InteractiveView, InteractiveViewError
@@ -148,6 +150,8 @@ from .workspace import (
 )
 
 __all__ = [
+    "RelayModelClient",
+    "RelayModelError",
     "InteractiveViews", "InteractiveView", "InteractiveViewError",
     "NexusFollowUpUnavailable",
     "RunInput",
@@ -285,4 +289,4 @@ __all__ = [
     "WorkspaceEntry",
 ]
 
-__version__ = "0.51.1"
+__version__ = "0.52.1"

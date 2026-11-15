@@ -223,3 +223,7 @@ The native simulator and Docker are installed separately from the SDK.
 ## Reusable model connections
 
 Hosted Nexus Cloud can reuse an explicitly approved model connection across selected Agents, tools and new conversations, with expiry, request allowances and revocation. See [Model connections and batch authorization](docs/model-connections.md). No SDK API change is required; always consume the resolved provider, model and base URL.
+
+## Relay model registration
+
+The SDK includes `nexus-relay` for device-code login, model registration, refresh and revocation. See the [Relay SDK guide](docs/relay-models.md). No `nexus_cli` dependency is required.

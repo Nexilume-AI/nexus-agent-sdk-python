@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nexilume"
-version = "0.51.1"
+version = "0.52.1"
 description = "Python Agent SDK for Nexus OpenWrt and hosted MCP runtimes"
 readme = "README_PYPI.md"
 requires-python = ">=3.9"
@@ -19,6 +19,7 @@ Documentation = "https://github.com/Nexilume-AI/nexus-agent-sdk-python/blob/main
 Issues = "https://github.com/Nexilume-AI/nexus-agent-sdk-python/issues"
 
 [project.scripts]
+nexus-relay = "nexus_agent.relay_cli:main"
 nexus-agent = "nexus_agent.runtime_health:main"
 nexus-agent-security = "nexus_agent.security_profile:main"
 nexus-agent-addressd = "nexus_agent.addressd:main"
