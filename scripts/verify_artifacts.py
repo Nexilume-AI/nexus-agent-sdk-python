@@ -17,7 +17,7 @@ project = tomllib.loads((root / 'pyproject.toml').read_text())['project']
 name = project['name'].replace('-', '_')
 version = project['version']
 stem = name + '-' + version
-assert name == 'nexilume' and version == '0.51.1', 'unexpected release identity'
+assert name == 'nexilume' and version == '0.52.1', 'unexpected release identity'
 secret = re.compile(rb'\bpypi-[A-Za-z0-9_-]{80,}|-----BEGIN (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----')
 
 
@@ -73,12 +73,15 @@ with tarfile.open(sdist) as archive:
         body = archive.extractfile(member).read()
         rel = Path(*path.parts[1:])
         scan_credentials(body, rel.as_posix())
-        assert not any(p.startswith('.') for p in rel.parts), rel
+        # Docker build-context exclusions are deliberately shipped with examples.
+        # Other hidden files/directories (including credentials) remain forbidden.
+        assert not any(p.startswith('.') for p in rel.parts[:-1]), rel
+        assert not rel.name.startswith('.') or (rel.name == '.dockerignore' and rel.parts[0] == 'examples'), rel
         if rel.as_posix() in {'PKG-INFO', 'setup.cfg'} or '.egg-info' in rel.as_posix():
             continue
         source = root / rel
         assert source.is_file() and archive.extractfile(member).read() == source.read_bytes(), str(rel)
-    for required in ('LICENSE', 'LICENSING.md', 'CONTRIBUTOR_LICENSE_AGREEMENT.md', 'README_PYPI.md'):
+    for required in ('LICENSE', 'LICENSING.md', 'CONTRIBUTOR_LICENSE_AGREEMENT.md', 'README_PYPI.md', 'docs/relay-models.md'):
         assert stem + '/' + required in seen, 'missing release document'
 for artifact in (wheel, sdist):
     print(hashlib.sha256(artifact.read_bytes()).hexdigest() + '  ' + artifact.name)

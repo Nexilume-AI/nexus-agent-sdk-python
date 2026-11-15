@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.52.1 — 2026-11-15
+
+- Add `RelayModelClient` and the SDK-owned `nexus-relay` command: browser-confirmed
+  device-code login, model registration, status, credential refresh and revocation.
+  No `nexus_cli`, manual key-file or state-file is required.
+- Restrict device credentials to approved models/endpoints; automatically manage
+  rotating credentials and idempotent registration receipts in a private POSIX
+  store. Linux/OpenWrt is required for Relay credential storage. Existing SDK
+  features retain their supported platforms.
+- Include headless login/resume, hidden endpoint-key import, JSON output, CLI and
+  SDK regression tests, and the complete Relay usage guide in the source archive.
+- Include the previously merged interactive views, authorization/background
+  event improvements, stream recovery and hardware-tool Agent examples since
+  0.51.1. These integrations require a compatible Nexus Cloud deployment.
+- Runtime imports remain `nexus_agent`; the dependency-free core supports
+  Python 3.9+, while building the source distribution requires Python 3.10+.
+
 ## 0.51.1 — 2026-10-20
 
 - Make the cooperative Queue/Steer example uploadable as a hosted Python Agent,

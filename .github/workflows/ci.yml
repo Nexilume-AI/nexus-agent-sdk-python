@@ -7,7 +7,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-24.04, windows-latest, macos-latest]
         python: ['3.12', '3.14']
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
@@ -27,7 +27,7 @@ jobs:
       - run: python -m twine check dist/*
       - run: python scripts/verify_artifacts.py
   core-python39:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -41,17 +41,17 @@ jobs:
         with:
           python-version: '3.9'
       - run: python -m pip install --no-deps dist/*.whl
-      - run: python -I -c "import nexus_agent; assert nexus_agent.__version__ == '0.51.1'"
+      - run: python -I -c "import nexus_agent; assert nexus_agent.__version__ == '0.52.1'"
       - run: python -I scripts/check_installation.py --extra core
   isolated-extras:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-24.04]
         python: ['3.10', '3.14']
         extra: [computer, browser, fastmcp, fastmcp-tasks, a2a]
         include:
-          - {os: ubuntu-latest, python: '3.9', extra: computer}
+          - {os: ubuntu-24.04, python: '3.9', extra: computer}
           - {os: windows-latest, python: '3.10', extra: windows}
           - {os: windows-latest, python: '3.14', extra: windows}
     runs-on: ${{ matrix.os }}
@@ -86,11 +86,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {os: ubuntu-latest, extra: computer, pins: 'websockets==15.0 cryptography==50.0.1 python-socks==2.4.3 tomli==2.0.1'}
-          - {os: ubuntu-latest, extra: browser, pins: 'playwright==1.63.0'}
-          - {os: ubuntu-latest, extra: fastmcp, pins: 'fastmcp==3.4.7 mcp==1.30.0 pydantic==2.11.7 jsonschema==4.20.0 uvicorn==0.35.0'}
-          - {os: ubuntu-latest, extra: fastmcp-tasks, pins: 'fastmcp==3.4.7 mcp==1.30.0 pydantic==2.11.7 jsonschema==4.20.0 uvicorn==0.35.0'}
-          - {os: ubuntu-latest, extra: a2a, pins: 'a2a-sdk==1.1.0 httpx==0.28.1 protobuf==5.29.5 pydantic==2.11.3'}
+          - {os: ubuntu-24.04, extra: computer, pins: 'websockets==15.0 cryptography==50.0.1 python-socks==2.4.3 tomli==2.0.1'}
+          - {os: ubuntu-24.04, extra: browser, pins: 'playwright==1.63.0'}
+          - {os: ubuntu-24.04, extra: fastmcp, pins: 'fastmcp==3.4.7 mcp==1.30.0 pydantic==2.11.7 jsonschema==4.20.0 uvicorn==0.35.0'}
+          - {os: ubuntu-24.04, extra: fastmcp-tasks, pins: 'fastmcp==3.4.7 mcp==1.30.0 pydantic==2.11.7 jsonschema==4.20.0 uvicorn==0.35.0'}
+          - {os: ubuntu-24.04, extra: a2a, pins: 'a2a-sdk==1.1.0 httpx==0.28.1 protobuf==5.29.5 pydantic==2.11.3'}
           - {os: windows-latest, extra: windows, pins: 'pywin32==306'}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15

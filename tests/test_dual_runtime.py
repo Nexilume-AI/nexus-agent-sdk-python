@@ -41,7 +41,7 @@ def test_hosted_declaration_never_discovers_authenticates_or_listens():
 
 def test_trusted_boot_selects_hosted_before_importing_unmodified_native_source():
     source = Path(__file__).parents[1] / "examples" / "dual_runtime_agent.py"
-    boot = Path(__file__).resolve().parents[4] / "nexus_server" / "apps" / "agents" / "python_profile" / "nexus_boot.py"
+    boot = Path(__file__).resolve().parent / "fixtures" / "nexus_boot.py"
     spec = importlib.util.spec_from_file_location("test_nexus_boot", boot)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

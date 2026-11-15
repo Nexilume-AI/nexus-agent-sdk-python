@@ -4,9 +4,11 @@ include install-linux.sh
 recursive-include examples *.py *.md *.txt *.html *.mjs *.js *.json *.yaml *.yml *.toml *.sh *.service *.lock *.commit *.png Dockerfile Dockerfile.* .dockerignore
 recursive-include deploy *.example *.service *.sysusers *.ps1
 recursive-include tests *.py
+include tests/fixtures/nexus_boot_SOURCE.md
 recursive-include scripts *.py
 global-exclude *.pyc
 
 include examples/openroad_mcp_agent/compose.yaml
 include tests/fixtures/openroad_mcp_tools_1_1_0.json
 include docs/agent-training-data.md
+include docs/relay-models.md

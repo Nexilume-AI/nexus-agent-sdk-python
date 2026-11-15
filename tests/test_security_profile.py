@@ -20,7 +20,7 @@ from nexus_agent import (  # noqa: E402
 class SecurityProfileTest(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="nexus-security-profile-")
-        self.root = pathlib.Path(self.temp.name)
+        self.root = pathlib.Path(self.temp.name).resolve()
         for name in ("ca.crt", "caller.crt", "caller.key"):
             (self.root / name).write_text(f"test {name}\n", encoding="ascii")
 
