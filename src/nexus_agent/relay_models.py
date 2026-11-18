@@ -233,6 +233,14 @@ class RelayModelClient:
             self._token(state)
             if model not in [s["model"] for s in state["tokens"]["models"]]:
                 raise RelayModelError("Model is not approved")
+            spec = next(s for s in state['tokens']['models'] if s['model'] == model)
+            if spec.get('transport') == 'outbound' and spec.get('provider_id'):
+                if endpoint_api_key:
+                    raise RelayModelError('Existing Provider adoption preserves its Cloud credential; do not import a key')
+                receipt = self._authorized(state, 'models/', {'model': model})
+                state.setdefault('registrations', {})[model] = receipt
+                self._save(state)
+                return receipt
             keys = state.setdefault("endpoint_keys", {})
             if endpoint_api_key:
                 if model in keys and keys[model] != endpoint_api_key:
@@ -245,6 +253,27 @@ class RelayModelClient:
             state.setdefault("registrations", {})[model] = receipt
             self._save(state)
             return receipt
+
+    def transport_status(self):
+        """Return approved bindings and the authenticated outbound WSS endpoint."""
+        with self._store() as state:
+            return self._authorized(state, 'transport/session/')
+
+    def _transport_credentials(self):
+        # Worker-only, never CLI output or a public status response.
+        with self._store() as state:
+            return {'token': self._token(state), 'models': state['tokens']['models']}
+
+    def activate_model(self, model):
+        """Verify the live tunnel, then switch only this approved binding."""
+        with self._store() as state:
+            receipt = state.get('registrations', {}).get(model, {})
+            if receipt.get('transport') != 'outbound' or not receipt.get('binding_id'):
+                raise RelayModelError('Register the outbound model before activating it')
+            result = self._authorized(state, 'transport/activate/', {'binding_id': receipt['binding_id']})
+            state['registrations'][model] = {**receipt, **result}
+            self._save(state)
+            return result
 
     def status(self):
         with self._store() as state:

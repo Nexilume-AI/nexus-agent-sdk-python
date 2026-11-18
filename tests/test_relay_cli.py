@@ -133,6 +133,15 @@ class RelayCLITests(unittest.TestCase):
         self.assertNotIn("accidental-secret", out.getvalue()+err.getvalue())
         self.client.register_model.assert_not_called()
 
+    def test_outbound_adoption_and_activation(self):
+        code,out,_=self.run_cli(['login','--model','kimi','--endpoint','https://api.example/v1','--outbound','--provider-id','provider-uuid','--no-wait'])
+        self.assertEqual(code,0)
+        declaration=self.client.begin_login.call_args.args[0][0]
+        self.assertEqual(declaration['transport'],'outbound');self.assertEqual(declaration['provider_id'],'provider-uuid')
+        self.client.activate_model.return_value={'status':'active'}
+        code,out,_=self.run_cli(['model','activate','kimi'])
+        self.assertEqual(code,0);self.client.activate_model.assert_called_once_with('kimi')
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,7 +1,9 @@
 # Relay model login and registration
 
 Use the OpenWrt **`nexilume` Python SDK**, independently of `nexus_cli`.
-The initial implementation manages an existing authenticated HTTPS model
+For generic outbound forwarding in SDK 0.53.0+, see [Outbound model Relay](outbound-model-relay.md).
+
+The original registration flow manages an existing authenticated HTTPS model
 endpoint. It does not open an inbound port or create an inference server.
 An existing outbound Relay transport can continue serving that endpoint.
 

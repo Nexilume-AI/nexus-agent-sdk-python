@@ -771,3 +771,7 @@ Nexus is licensed under a modified version of the Apache License 2.0, with the f
 ## Relay models
 
 [Device login, registration and CLI](docs/relay-models.md) (SDK 0.52.1+).
+
+## Generic outbound transport
+
+SDK 0.53.0 adds streaming forwarding, reconnect and existing Provider adoption. See [Outbound model Relay](docs/outbound-model-relay.md).

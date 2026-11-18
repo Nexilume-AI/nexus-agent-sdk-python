@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nexilume"
-version = "0.52.1"
+version = "0.53.0"
 description = "Python Agent SDK for Nexus OpenWrt and hosted MCP runtimes"
 readme = "README_PYPI.md"
 requires-python = ">=3.9"
@@ -27,6 +27,7 @@ nexus-agent-addressd-service = "nexus_agent.windows_service:main"
 nexus-computer = "nexus_agent.computer_runtime:main"
 
 [project.optional-dependencies]
+relay = ["aiohttp>=3.14.4,<4; python_version >= '3.11'"]
 fastmcp = [
     "fastmcp>=3.4.7,<4", "mcp>=1.30,<2", "pydantic>=2.11.7,<3",
     "jsonschema>=4.20,<5", "uvicorn>=0.35,<1",

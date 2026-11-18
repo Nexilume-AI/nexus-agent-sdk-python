@@ -48,6 +48,8 @@ def parser():
     login.add_argument("--name", help="Display name; defaults to model ID")
     login.add_argument("--endpoint", help="Existing authenticated HTTPS model endpoint")
     login.add_argument("--protocol", choices=["system_one", "openai-compatible"], help="Default: openai-compatible")
+    login.add_argument("--outbound", action="store_true", help="Forward the approved upstream through this device")
+    login.add_argument("--provider-id", help="Adopt an existing Cloud Provider without changing its key or Router bindings")
     login.add_argument("--models-json", type=Path, help="Optional JSON array of model/endpoint declarations (not credentials)")
     login.add_argument("--resume", action="store_true", help="Continue a pending login without creating a new code")
     login.add_argument("--no-wait", action="store_true", help="Print the code/URL and exit; later use login --resume")
@@ -56,6 +58,9 @@ def parser():
     actions = model.add_subparsers(dest="model_action", required=True)
     register = actions.add_parser("register", parents=[common], help="Idempotently register an approved model")
     register.add_argument("model", help="Exact browser-approved model ID")
+    activate = actions.add_parser('activate', parents=[common], help='Verify a running tunnel and activate its registered model binding')
+    activate.add_argument('model', help='An already registered outbound model')
+    commands.add_parser('serve', parents=[common], help='Run outbound WSS forwarding with automatic reconnect (requires nexilume[relay])')
     keys = register.add_mutually_exclusive_group()
     keys.add_argument("--endpoint-key-stdin", action="store_true", help="Import the existing endpoint key once from stdin")
     keys.add_argument("--prompt-endpoint-key", action="store_true", help="Import the endpoint key once using a hidden terminal prompt")
@@ -67,7 +72,7 @@ def parser():
 
 
 def _manifest(args):
-    inline = any(getattr(args, name) for name in ("model", "name", "endpoint", "protocol"))
+    inline = any(getattr(args, name) for name in ("model", "name", "endpoint", "protocol", "outbound", "provider_id"))
     if args.resume:
         if inline or args.models_json or args.no_wait:
             raise UsageError("--resume cannot be combined with new declarations or --no-wait")
@@ -88,13 +93,17 @@ def _manifest(args):
             raise UsageError("login requires --model and --endpoint, or --models-json, or --resume")
         models = [{"model": args.model, "name": args.name or args.model,
             "endpoint": args.endpoint, "protocol": args.protocol or "openai-compatible"}]
+        if args.outbound:models[0]['transport'] = 'outbound'
+        if args.provider_id:models[0]['provider_id'] = args.provider_id
     if not isinstance(models, list) or not 1 <= len(models) <= 32:
         raise UsageError("Provide an array of 1 to 32 model declarations")
     allowed = {"name", "model", "endpoint", "protocol"}
     for item in models:
-        if (not isinstance(item, dict) or set(item) != allowed
+        if (not isinstance(item, dict) or not allowed.issubset(item) or set(item) - allowed - {'transport', 'provider_id'}
                 or not all(isinstance(value, str) and value.strip() for value in item.values())):
             raise UsageError("Each declaration needs only name, model, endpoint and protocol; no credentials")
+        if item.get('transport') not in (None, 'outbound') or (item.get('provider_id') and item.get('transport') != 'outbound'):
+            raise UsageError('Provider adoption requires outbound transport')
     if len({item["model"] for item in models}) != len(models):
         raise UsageError("Model IDs must be distinct")
     return models
@@ -149,8 +158,18 @@ def main(argv=None):
                 time.sleep(min(5, remaining))
             result = {"status": "connected", **client.status()}
         elif args.command == "model":
-            key = _endpoint_key(args)
-            result = client.register_model(args.model, **({"endpoint_api_key": key} if key is not None else {}))
+            if args.model_action == 'activate':result = client.activate_model(args.model)
+            else:
+                key = _endpoint_key(args)
+                result = client.register_model(args.model, **({"endpoint_api_key": key} if key is not None else {}))
+        elif args.command == 'serve':
+            if sys.version_info < (3, 11):raise UsageError('Model forwarding requires Python 3.11 or newer')
+            try:
+                import asyncio
+                from .model_relay import serve
+            except ImportError:raise UsageError('Install nexilume[relay] to enable model forwarding') from None
+            asyncio.run(serve(client))
+            return 0
         elif args.command == "revoke":
             if not args.yes:
                 if not sys.stdin.isatty():
